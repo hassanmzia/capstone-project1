@@ -4,7 +4,7 @@
  * Supports multiple channel overlay with peak frequency annotation.
  */
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import { useDataStream } from "@/hooks/useDataStream";
@@ -44,7 +44,6 @@ export default function FFTDisplay({
 
   const { getLatestData } = useDataStream({ channelCount: 64, targetFps: 30 });
 
-  const frequencyResolution = sampleRate / fftSize;
   const nyquist = sampleRate / 2;
 
   // Simple FFT (Cooley-Tukey radix-2 DIT)
@@ -145,7 +144,6 @@ export default function FFTDisplay({
         Math.ceil((maxFrequency / nyquist) * (fftSize / 2)),
         fftSize / 2 - 1
       );
-      const binRange = maxBin - minBin;
 
       // Draw grid
       ctx.strokeStyle = "rgba(255,255,255,0.08)";

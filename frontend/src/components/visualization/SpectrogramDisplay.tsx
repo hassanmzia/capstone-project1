@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import { useDataStream } from "@/hooks/useDataStream";
-import { viridis, buildLUT, createCSSGradient, type ColormapFn, COLORMAPS } from "@/utils/colorMaps";
+import { viridis, buildLUT, type ColormapFn, COLORMAPS } from "@/utils/colorMaps";
 
 interface SpectrogramDisplayProps {
   className?: string;
@@ -123,7 +123,6 @@ export default function SpectrogramDisplay({
     if (!ctx) return;
 
     let running = true;
-    let lastProcessedSample = 0;
 
     const renderFrame = () => {
       if (!running) return;
@@ -263,8 +262,6 @@ export default function SpectrogramDisplay({
       cancelAnimationFrame(animRef.current);
     };
   }, [channel, windowSize, hopSize, maxFrequency, maxBin, dynamicRange, lut, getLatestData, computeFFTColumn]);
-
-  const gradientCSS = useMemo(() => createCSSGradient(colormap, "to top", 16), [colormap]);
 
   return (
     <div className={`flex flex-col bg-neural-surface rounded-xl border border-neural-border ${className}`}>

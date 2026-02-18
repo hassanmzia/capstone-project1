@@ -17,14 +17,12 @@ import type { RootState } from "@/store";
 import {
   setDisplayMode,
   setTimebase,
-  setAmplitudeScale,
   toggleSpikes,
   toggleThreshold,
   toggleGridOverlay,
   togglePause,
   toggleChannel,
   setSelectedChannels,
-  resetView,
 } from "@/store/slices/visualizationSlice";
 import type { DisplayMode } from "@/types/neural";
 
@@ -51,8 +49,6 @@ import {
   Monitor,
   Cpu,
   Radio,
-  ChevronLeft,
-  ChevronRight,
   Thermometer,
   LayoutGrid,
 } from "lucide-react";

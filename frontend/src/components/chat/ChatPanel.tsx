@@ -3,7 +3,6 @@ import { useSelector, useDispatch } from "react-redux";
 import type { RootState } from "@/store";
 import {
   addMessage,
-  togglePanel,
   closePanel,
   setStreaming,
   setSuggestedActions,
@@ -15,8 +14,6 @@ import {
   Bot,
   User,
   Wrench,
-  ChevronDown,
-  Minimize2,
   Sparkles,
   CheckCircle2,
   AlertCircle,
