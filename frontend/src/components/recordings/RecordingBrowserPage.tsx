@@ -18,7 +18,7 @@ import {
   Activity,
 } from "lucide-react";
 
-interface MockRecording {
+export interface MockRecording {
   id: string;
   name: string;
   experimentName: string;
@@ -29,16 +29,32 @@ interface MockRecording {
   fileSize: string;
   format: string;
   status: "completed" | "error" | "processing";
+  sampleRate?: string;
 }
 
-const mockRecordings: MockRecording[] = [
-  { id: "rec-042", name: "session_042", experimentName: "Hippocampal CA1 Place Cell Study", date: "2026-02-18 09:15", duration: "15:32", spikeCount: 48291, channels: 64, fileSize: "2.4 GB", format: "HDF5", status: "completed" },
-  { id: "rec-041", name: "session_041", experimentName: "Hippocampal CA1 Place Cell Study", date: "2026-02-17 14:22", duration: "30:10", spikeCount: 95100, channels: 64, fileSize: "4.8 GB", format: "HDF5", status: "completed" },
-  { id: "rec-040", name: "session_040", experimentName: "Cortical Spike Timing Analysis", date: "2026-02-16 11:05", duration: "10:00", spikeCount: 22430, channels: 32, fileSize: "1.1 GB", format: "NWB", status: "completed" },
-  { id: "rec-039", name: "session_039", experimentName: "Cortical Spike Timing Analysis", date: "2026-02-15 16:40", duration: "05:45", spikeCount: 0, channels: 32, fileSize: "540 MB", format: "NWB", status: "processing" },
-  { id: "rec-038", name: "session_038", experimentName: "Retinal Ganglion Response Mapping", date: "2026-02-14 10:30", duration: "20:00", spikeCount: 67800, channels: 128, fileSize: "6.2 GB", format: "HDF5", status: "completed" },
-  { id: "rec-037", name: "session_037_failed", experimentName: "Retinal Ganglion Response Mapping", date: "2026-02-14 09:00", duration: "02:15", spikeCount: 1200, channels: 128, fileSize: "320 MB", format: "RAW", status: "error" },
+const seedRecordings: MockRecording[] = [
+  { id: "rec-042", name: "session_042", experimentName: "Hippocampal CA1 Place Cell Study", date: "2026-02-18 09:15", duration: "15:32", spikeCount: 48291, channels: 64, fileSize: "2.4 GB", format: "HDF5", status: "completed", sampleRate: "30000" },
+  { id: "rec-041", name: "session_041", experimentName: "Hippocampal CA1 Place Cell Study", date: "2026-02-17 14:22", duration: "30:10", spikeCount: 95100, channels: 64, fileSize: "4.8 GB", format: "HDF5", status: "completed", sampleRate: "30000" },
+  { id: "rec-040", name: "session_040", experimentName: "Cortical Spike Timing Analysis", date: "2026-02-16 11:05", duration: "10:00", spikeCount: 22430, channels: 32, fileSize: "1.1 GB", format: "NWB", status: "completed", sampleRate: "30000" },
+  { id: "rec-039", name: "session_039", experimentName: "Cortical Spike Timing Analysis", date: "2026-02-15 16:40", duration: "05:45", spikeCount: 0, channels: 32, fileSize: "540 MB", format: "NWB", status: "processing", sampleRate: "30000" },
+  { id: "rec-038", name: "session_038", experimentName: "Retinal Ganglion Response Mapping", date: "2026-02-14 10:30", duration: "20:00", spikeCount: 67800, channels: 128, fileSize: "6.2 GB", format: "HDF5", status: "completed", sampleRate: "20000" },
+  { id: "rec-037", name: "session_037_failed", experimentName: "Retinal Ganglion Response Mapping", date: "2026-02-14 09:00", duration: "02:15", spikeCount: 1200, channels: 128, fileSize: "320 MB", format: "RAW", status: "error", sampleRate: "20000" },
 ];
+
+const RECORDINGS_KEY = "cnea_recordings";
+
+function loadRecordings(): MockRecording[] {
+  try {
+    const raw = localStorage.getItem(RECORDINGS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  localStorage.setItem(RECORDINGS_KEY, JSON.stringify(seedRecordings));
+  return seedRecordings;
+}
+
+function saveRecordings(recs: MockRecording[]) {
+  localStorage.setItem(RECORDINGS_KEY, JSON.stringify(recs));
+}
 
 const availableExperiments = [
   { id: "exp-001", name: "Hippocampal CA1 Place Cell Study" },
@@ -52,7 +68,7 @@ type RecordingPhase = "idle" | "setup" | "recording";
 export default function RecordingBrowserPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const [recordings, setRecordings] = useState(mockRecordings);
+  const [recordings, setRecordings] = useState<MockRecording[]>(loadRecordings);
   const [phase, setPhase] = useState<RecordingPhase>("idle");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showFilterMenu, setShowFilterMenu] = useState(false);
@@ -70,6 +86,32 @@ export default function RecordingBrowserPage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
 
+  // Persist recordings whenever they change
+  useEffect(() => {
+    saveRecordings(recordings);
+  }, [recordings]);
+
+  // Simulate processing → completed after a short delay for newly stopped recordings
+  useEffect(() => {
+    const processing = recordings.filter((r) => r.status === "processing" && r.id.startsWith("rec-0") === false);
+    if (processing.length === 0) return;
+
+    const timeout = setTimeout(() => {
+      setRecordings((prev) =>
+        prev.map((r) => {
+          if (r.status !== "processing") return r;
+          // Simulate spike sorting results
+          const durationParts = r.duration.split(":");
+          const totalSec = parseInt(durationParts[0]) * 60 + parseInt(durationParts[1]);
+          const estimatedSpikes = Math.round(totalSec * r.channels * (30 + Math.random() * 20));
+          return { ...r, status: "completed" as const, spikeCount: estimatedSpikes };
+        }),
+      );
+    }, 5000); // 5-second simulated processing time
+
+    return () => clearTimeout(timeout);
+  }, [recordings]);
+
   // Clean up timer on unmount
   useEffect(() => {
     return () => {
@@ -77,7 +119,7 @@ export default function RecordingBrowserPage() {
     };
   }, []);
 
-  const nextSessionNum = 43 + recordings.length;
+  const nextSessionNum = 43 + recordings.filter((r) => !seedRecordings.some((s) => s.id === r.id)).length;
   const defaultName = `session_${String(nextSessionNum).padStart(3, "0")}`;
 
   const handleStartSetup = () => {
@@ -110,7 +152,7 @@ export default function RecordingBrowserPage() {
     const channels = parseInt(setupChannels) || 64;
     const sizeEstMB = Math.round(channels * (parseInt(setupSampleRate) || 30000) * 2 * elapsedSec / 1e6);
 
-    const id = `rec-${String(nextSessionNum).padStart(3, "0")}`;
+    const id = `rec-new-${Date.now()}`;
     setRecordings((prev) => [
       {
         id,
@@ -123,6 +165,7 @@ export default function RecordingBrowserPage() {
         fileSize: sizeEstMB >= 1000 ? `${(sizeEstMB / 1000).toFixed(1)} GB` : `${sizeEstMB} MB`,
         format: setupFormat,
         status: "processing" as const,
+        sampleRate: setupSampleRate,
       },
       ...prev,
     ]);
