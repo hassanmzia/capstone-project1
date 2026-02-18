@@ -10,6 +10,7 @@ import {
   Clock,
   Zap,
 } from "lucide-react";
+import NotificationPanel from "@/components/notifications/NotificationPanel";
 
 function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -79,6 +80,8 @@ export default function Header() {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-3">
+        <NotificationPanel />
+
         <button
           onClick={() => dispatch(togglePanel())}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm neural-transition ${
