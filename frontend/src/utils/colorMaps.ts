@@ -97,6 +97,40 @@ export function neuralActivity(value: number): RGB {
   return samplePiecewise(neuralActivityStops, value);
 }
 
+/* ─── Inferno: black → purple → red → orange → yellow → white ─── */
+const infernoStops: { pos: number; color: RGB }[] = [
+  { pos: 0.0, color: [0, 0, 4] },
+  { pos: 0.13, color: [40, 11, 84] },
+  { pos: 0.25, color: [101, 21, 110] },
+  { pos: 0.38, color: [159, 42, 99] },
+  { pos: 0.5, color: [212, 72, 66] },
+  { pos: 0.63, color: [245, 125, 21] },
+  { pos: 0.75, color: [250, 193, 39] },
+  { pos: 0.88, color: [252, 230, 92] },
+  { pos: 1.0, color: [252, 255, 164] },
+];
+
+export function inferno(value: number): RGB {
+  return samplePiecewise(infernoStops, value);
+}
+
+/* ─── Turbo: blue → cyan → green → yellow → red ─── */
+const turboStops: { pos: number; color: RGB }[] = [
+  { pos: 0.0, color: [48, 18, 59] },
+  { pos: 0.13, color: [68, 81, 191] },
+  { pos: 0.25, color: [33, 145, 235] },
+  { pos: 0.38, color: [29, 200, 171] },
+  { pos: 0.5, color: [122, 230, 91] },
+  { pos: 0.63, color: [210, 226, 49] },
+  { pos: 0.75, color: [253, 174, 39] },
+  { pos: 0.88, color: [234, 96, 26] },
+  { pos: 1.0, color: [122, 4, 3] },
+];
+
+export function turbo(value: number): RGB {
+  return samplePiecewise(turboStops, value);
+}
+
 /* ─── Utility: generate a CSS gradient string from any colormap ─── */
 export type ColormapFn = (value: number) => RGB;
 
@@ -132,6 +166,8 @@ export function buildLUT(colormap: ColormapFn, size: number = 256): Uint8Array {
 export const COLORMAPS: Record<string, ColormapFn> = {
   viridis,
   plasma,
+  inferno,
+  turbo,
   coolwarm,
   neuralActivity,
 };
