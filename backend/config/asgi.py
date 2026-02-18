@@ -17,7 +17,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.base")
 # before importing consumers that may reference Django models.
 django_asgi_app = get_asgi_application()
 
-from channels.routing import websocket_urlpatterns  # noqa: E402
+from ws.routing import websocket_urlpatterns  # noqa: E402
 
 application = ProtocolTypeRouter(
     {
