@@ -18,9 +18,14 @@ export interface Notification {
 }
 
 const MAX_NOTIFICATIONS = 200;
-const WS_URL =
-  (import.meta.env.VITE_WS_URL ?? "ws://localhost:3026") +
-  "/ws/notifications";
+
+function getWsUrl(): string {
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL + "/ws/notifications";
+  }
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}/ws/notifications`;
+}
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -31,7 +36,7 @@ export function useNotifications() {
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(getWsUrl());
     wsRef.current = ws;
 
     ws.onopen = () => setConnected(true);
