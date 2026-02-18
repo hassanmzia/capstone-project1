@@ -172,6 +172,11 @@ def _strip_think_tags(text: str) -> str:
 async def _stream_ollama(
     messages: List[Dict[str, str]], model: str, temperature: float
 ) -> AsyncGenerator[str, None]:
+    """Stream tokens from Ollama, filtering <think>…</think> blocks.
+
+    Uses buffered accumulation to handle tags that are split across
+    multiple tokens (e.g. ``<`` + ``think>``).
+    """
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
             async with client.stream(
@@ -185,7 +190,14 @@ async def _stream_ollama(
                 },
             ) as response:
                 response.raise_for_status()
-                in_think = False
+
+                # Buffer-based <think> filter:
+                #   phase="detect"  – accumulating first tokens to check for <think>
+                #   phase="think"   – inside think block, suppressing output
+                #   phase="output"  – past any think block, yielding tokens
+                phase = "detect"
+                buf = ""
+
                 async for line in response.aiter_lines():
                     if not line:
                         continue
@@ -193,21 +205,54 @@ async def _stream_ollama(
                         data = json.loads(line)
                         token = data.get("message", {}).get("content", "")
                         if data.get("done", False):
+                            # Flush any remaining buffer
+                            if phase == "detect" and buf:
+                                cleaned = _strip_think_tags(buf)
+                                if cleaned:
+                                    yield cleaned
                             return
                         if not token:
                             continue
-                        # Filter <think> blocks from reasoning models
-                        if "<think>" in token:
-                            in_think = True
-                            continue
-                        if "</think>" in token:
-                            in_think = False
-                            continue
-                        if in_think:
-                            continue
-                        yield token
+
+                        if phase == "detect":
+                            buf += token
+                            if "<think>" in buf:
+                                # Think block found; discard everything up to
+                                # and including <think>
+                                phase = "think"
+                                idx = buf.index("<think>")
+                                before = buf[:idx]
+                                if before.strip():
+                                    yield before
+                                buf = buf[idx + 7:]  # keep remainder after tag
+                            elif len(buf) > 50:
+                                # No think tag in first 50 chars → model
+                                # doesn't use think blocks; flush and stream
+                                phase = "output"
+                                yield buf
+                                buf = ""
+                        elif phase == "think":
+                            buf += token
+                            if "</think>" in buf:
+                                # End of think block; yield anything after tag
+                                phase = "output"
+                                idx = buf.index("</think>")
+                                after = buf[idx + 8:]
+                                buf = ""
+                                if after.strip():
+                                    yield after
+                        else:  # phase == "output"
+                            yield token
+
                     except json.JSONDecodeError:
                         continue
+
+                # Stream ended without done flag – flush buffer
+                if phase == "detect" and buf:
+                    cleaned = _strip_think_tags(buf)
+                    if cleaned:
+                        yield cleaned
+
     except httpx.ConnectError:
         yield "Cannot connect to the Ollama service. Please ensure it is running."
     except Exception as exc:
