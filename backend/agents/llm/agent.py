@@ -33,6 +33,7 @@ from .rag.embedder import OllamaEmbedder
 from .rag.indexer import DocumentIndexer
 from .rag.pipeline import RAGPipeline
 from .rag.retriever import DocumentRetriever
+from .providers import get_available_models, parse_model_id, stream_chat as provider_stream_chat
 from .tools.mcp_bridge import MCPToolBridge
 
 logger = logging.getLogger(__name__)
@@ -248,6 +249,12 @@ class LLMAgent(BaseAgent):
                 )
             return await self.handle_chat(request)
 
+        # --- Available models ---
+        @self.app.get("/models")
+        async def list_models():
+            """Return the list of available LLM providers/models."""
+            return {"models": get_available_models()}
+
         # --- RAG endpoints ---
         @self.app.post("/rag/query")
         async def rag_query(request: RAGQueryRequest):
@@ -428,37 +435,17 @@ class LLMAgent(BaseAgent):
             if role in ("user", "assistant"):
                 llm_messages.append({"role": role, "content": content})
 
-        # Stream from Ollama
+        # Stream from the selected provider (Ollama / OpenAI / Anthropic)
+        model_id = request.model  # e.g. "openai/gpt-4o" or "ollama/deepseek-r1:7b"
         full_response = ""
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
-                async with client.stream(
-                    "POST",
-                    f"{OLLAMA_BASE_URL}/api/chat",
-                    json={
-                        "model": request.model or OLLAMA_CHAT_MODEL,
-                        "messages": llm_messages,
-                        "stream": True,
-                    },
-                ) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if not line:
-                            continue
-                        try:
-                            data = json.loads(line)
-                            token = data.get("message", {}).get("content", "")
-                            if token:
-                                full_response += token
-                                yield f"data: {json.dumps({'token': token, 'session_id': session_id})}\n\n"
-                            if data.get("done", False):
-                                break
-                        except json.JSONDecodeError:
-                            continue
-        except httpx.ConnectError:
-            error_msg = "Cannot connect to the language model service."
-            yield f"data: {json.dumps({'error': error_msg, 'session_id': session_id})}\n\n"
-            full_response = error_msg
+            async for token in provider_stream_chat(
+                messages=llm_messages,
+                model_id=model_id,
+                temperature=request.temperature,
+            ):
+                full_response += token
+                yield f"data: {json.dumps({'token': token, 'session_id': session_id})}\n\n"
         except Exception as exc:
             error_msg = f"Streaming error: {exc}"
             yield f"data: {json.dumps({'error': error_msg, 'session_id': session_id})}\n\n"
