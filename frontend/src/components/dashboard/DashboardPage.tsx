@@ -1,6 +1,7 @@
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState } from "@/store";
 import { startRecording, stopRecording } from "@/store/slices/recordingSlice";
+import { generateId } from "@/utils/uuid";
 import {
   Activity,
   Circle,
@@ -53,7 +54,7 @@ export default function DashboardPage() {
   const config = useSelector((state: RootState) => state.config);
 
   const handleStartRecording = () => {
-    dispatch(startRecording({ id: crypto.randomUUID(), sampleRate: 30000, channels: 64 }));
+    dispatch(startRecording({ id: generateId(), sampleRate: 30000, channels: 64 }));
   };
 
   const handleStopRecording = () => {

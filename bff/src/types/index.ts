@@ -3,7 +3,7 @@ import type { IncomingMessage } from 'http';
 
 // ─── WebSocket Channel Names ────────────────────────────────────────────────
 
-export type WsChannel = 'neural-data' | 'agent-status' | 'chat';
+export type WsChannel = 'neural-data' | 'agent-status' | 'chat' | 'spike-events' | 'notifications';
 
 // ─── WebSocket Message Types ────────────────────────────────────────────────
 
@@ -102,7 +102,8 @@ export type RedisChannel =
   | 'neural:spike_events'
   | 'neural:pcb_data'
   | 'neural:agent_health'
-  | 'neural:alerts';
+  | 'neural:alerts'
+  | 'neural:notifications';
 
 export interface RedisChannelMapping {
   redisChannel: RedisChannel;
@@ -118,6 +119,8 @@ export interface HealthCheckResponse {
     'neural-data': number;
     'agent-status': number;
     chat: number;
+    'spike-events': number;
+    notifications: number;
     total: number;
   };
   timestamp: string;

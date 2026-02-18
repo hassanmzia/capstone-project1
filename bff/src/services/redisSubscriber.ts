@@ -12,10 +12,11 @@ import type { RedisChannel, WsChannel } from '../types/index.js';
 // Mapping from Redis channel names to WebSocket channel names
 const CHANNEL_MAP: Record<RedisChannel, WsChannel> = {
   'neural:processed_data': 'neural-data',
-  'neural:spike_events': 'neural-data',
+  'neural:spike_events': 'spike-events',
   'neural:pcb_data': 'neural-data',
   'neural:agent_health': 'agent-status',
   'neural:alerts': 'agent-status',
+  'neural:notifications': 'notifications',
 };
 
 const REDIS_CHANNELS: RedisChannel[] = [
@@ -24,6 +25,7 @@ const REDIS_CHANNELS: RedisChannel[] = [
   'neural:pcb_data',
   'neural:agent_health',
   'neural:alerts',
+  'neural:notifications',
 ];
 
 let subscriber: Redis | null = null;

@@ -1,12 +1,15 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState } from "@/store";
 import {
   addMessage,
+  updateLastMessage,
   closePanel,
   setStreaming,
   setSuggestedActions,
+  setSessionId,
 } from "@/store/slices/chatSlice";
+import { useWebSocket } from "@/hooks/useWebSocket";
 import {
   X,
   Send,
@@ -19,6 +22,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { ChatMessage, ToolCall } from "@/types/neural";
+import { generateId } from "@/utils/uuid";
 
 function ToolCallDisplay({ toolCall }: { toolCall: ToolCall }) {
   return (
@@ -88,11 +92,71 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
 export default function ChatPanel() {
   const dispatch = useDispatch();
-  const { messages, isPanelOpen, isStreaming, suggestedActions } = useSelector(
+  const { messages, isPanelOpen, isStreaming, suggestedActions, sessionId } = useSelector(
     (state: RootState) => state.chat
   );
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const streamBufferRef = useRef("");
+  const assistantMsgIdRef = useRef<string | null>(null);
+
+  // Ensure we have a session ID
+  useEffect(() => {
+    if (!sessionId) {
+      dispatch(setSessionId(generateId()));
+    }
+  }, [sessionId, dispatch]);
+
+  const handleWsMessage = useCallback(
+    (data: unknown) => {
+      const msg = data as { type?: string; token?: string };
+
+      if (msg.type === "chat.token" && msg.token) {
+        if (!assistantMsgIdRef.current) {
+          // Create assistant message on first token
+          const id = generateId();
+          assistantMsgIdRef.current = id;
+          streamBufferRef.current = msg.token;
+          dispatch(
+            addMessage({
+              id,
+              role: "assistant",
+              content: msg.token,
+              timestamp: new Date().toISOString(),
+              isStreaming: true,
+            })
+          );
+        } else {
+          streamBufferRef.current += msg.token;
+          dispatch(updateLastMessage({ content: streamBufferRef.current }));
+        }
+      } else if (msg.type === "chat.end") {
+        dispatch(setStreaming(false));
+        assistantMsgIdRef.current = null;
+        streamBufferRef.current = "";
+        dispatch(
+          setSuggestedActions([
+            "Show more details",
+            "Run analysis",
+            "Export results",
+            "Configure parameters",
+          ])
+        );
+      } else if ((msg as Record<string, unknown>).error) {
+        dispatch(setStreaming(false));
+        assistantMsgIdRef.current = null;
+        streamBufferRef.current = "";
+      }
+    },
+    [dispatch]
+  );
+
+  const { sendMessage, isConnected } = useWebSocket({
+    url: "/ws/chat",
+    onMessage: handleWsMessage,
+    reconnect: true,
+    reconnectInterval: 3000,
+  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -102,35 +166,23 @@ export default function ChatPanel() {
     if (!input.trim() || isStreaming) return;
 
     const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       role: "user",
       content: input.trim(),
       timestamp: new Date().toISOString(),
     };
 
     dispatch(addMessage(userMessage));
-    setInput("");
     dispatch(setStreaming(true));
+    dispatch(setSuggestedActions([]));
 
-    // Simulate assistant response
-    setTimeout(() => {
-      const assistantMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: `I understand you want to "${input.trim()}". Let me help you with that. This is a placeholder response - the actual LLM integration will stream responses from the backend agent.`,
-        timestamp: new Date().toISOString(),
-      };
-      dispatch(addMessage(assistantMessage));
-      dispatch(setStreaming(false));
-      dispatch(
-        setSuggestedActions([
-          "Show more details",
-          "Run analysis",
-          "Export results",
-          "Configure parameters",
-        ])
-      );
-    }, 1500);
+    sendMessage({
+      type: "chat.message",
+      session_id: sessionId,
+      content: input.trim(),
+    });
+
+    setInput("");
   };
 
   const handleSuggestedAction = (action: string) => {
@@ -146,6 +198,7 @@ export default function ChatPanel() {
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-neural-accent-purple" />
           <span className="text-sm font-semibold text-neural-text-primary">AI Assistant</span>
+          <span className={`w-2 h-2 rounded-full ${isConnected ? "bg-neural-accent-green" : "bg-neural-text-muted"}`} title={isConnected ? "Connected" : "Disconnected"} />
         </div>
         <div className="flex items-center gap-1">
           <button

@@ -23,6 +23,8 @@ export function createHealthRouter(): Router {
         'neural-data': clientCounts['neural-data'],
         'agent-status': clientCounts['agent-status'],
         chat: clientCounts.chat,
+        'spike-events': clientCounts['spike-events'],
+        notifications: clientCounts.notifications,
         total: clientCounts.total,
       },
       timestamp: new Date().toISOString(),

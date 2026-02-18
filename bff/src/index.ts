@@ -45,6 +45,14 @@ const WS_ROUTE_MAP: Record<string, { djangoPath: string; channel: WsChannel }> =
     djangoPath: '/ws/chat/',
     channel: 'chat',
   },
+  '/ws/spike-events': {
+    djangoPath: '/ws/spike-events/',
+    channel: 'spike-events',
+  },
+  '/ws/notifications': {
+    djangoPath: '/ws/notifications/',
+    channel: 'notifications',
+  },
 };
 
 // ─── Express App Setup ──────────────────────────────────────────────────────
