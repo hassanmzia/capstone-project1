@@ -32,6 +32,127 @@ interface AnalysisDetail {
   notes: string;
 }
 
+const ANALYSIS_JOBS_KEY = "cnea_analysis_jobs";
+
+/** Generate plausible detail fields for a user-created analysis job from localStorage */
+function buildDetailFromStoredJob(raw: {
+  id: string;
+  type: string;
+  recording: string;
+  recordingId?: string;
+  status: string;
+  progress: number;
+  duration: string;
+  result: string;
+}): AnalysisDetail {
+  const now = new Date();
+  const completedAt = now.toISOString().slice(0, 16).replace("T", " ");
+  const durMinutes = parseInt(raw.duration) || 2;
+  const startedAt = new Date(now.getTime() - durMinutes * 60000).toISOString().slice(0, 16).replace("T", " ");
+
+  const paramTemplates: Record<string, { label: string; value: string }[]> = {
+    "Spike Sorting": [
+      { label: "Algorithm", value: "Kilosort 3" },
+      { label: "Threshold", value: "6.0 std" },
+      { label: "Min Cluster Size", value: "30 spikes" },
+      { label: "Max Drift", value: "10 um" },
+      { label: "Auto-merge", value: "Threshold 0.85" },
+    ],
+    "Burst Detection": [
+      { label: "Algorithm", value: "LogISI" },
+      { label: "Min Burst Spikes", value: "3" },
+      { label: "Max ISI (intra-burst)", value: "10 ms" },
+      { label: "Min Inter-burst Interval", value: "100 ms" },
+    ],
+    "PCA / Clustering": [
+      { label: "Components", value: "3" },
+      { label: "Feature Space", value: "Waveform peaks + PCA" },
+      { label: "Normalization", value: "Z-score" },
+    ],
+    "Cross-Correlation": [
+      { label: "Bin Size", value: "0.5 ms" },
+      { label: "Window", value: "+/- 50 ms" },
+      { label: "Significance", value: "p < 0.01 (jitter)" },
+    ],
+    "ISI Analysis": [
+      { label: "Bin Size", value: "1 ms" },
+      { label: "Max ISI", value: "500 ms" },
+      { label: "Log Scale", value: "Yes" },
+    ],
+    "Spectral Analysis": [
+      { label: "FFT Window", value: "Hanning" },
+      { label: "Segment Length", value: "1.0 s" },
+      { label: "Overlap", value: "50%" },
+      { label: "Frequency Range", value: "1-500 Hz" },
+    ],
+  };
+
+  const outputTemplates: Record<string, { label: string; value: string }[]> = {
+    "Spike Sorting": [
+      { label: "Total Units", value: raw.result.split(" ")[0] || "—" },
+      { label: "Isolation Score", value: "0.87 (median)" },
+      { label: "ISI Violations < 2ms", value: "1.5%" },
+    ],
+    "Burst Detection": [
+      { label: "Total Bursts", value: raw.result.split(" ")[0] || "—" },
+      { label: "Mean Burst Duration", value: "42.1 ms" },
+      { label: "Burst Rate", value: "4.2 /min" },
+    ],
+    "PCA / Clustering": [
+      { label: "Total Explained Variance", value: raw.result.includes("%") ? raw.result.split(",").pop()?.trim() || "—" : "—" },
+      { label: "Clusters Found", value: "3" },
+      { label: "Silhouette Score", value: "0.76" },
+    ],
+    "Cross-Correlation": [
+      { label: "Total Pairs Tested", value: "820" },
+      { label: "Significant Pairs", value: raw.result.split(" ")[0] || "—" },
+      { label: "Mean Peak Latency", value: "2.5 ms" },
+    ],
+    "ISI Analysis": [
+      { label: "Mean ISI", value: raw.result.includes("ms") ? raw.result.split(":").pop()?.trim() || "—" : "—" },
+      { label: "CV (ISI)", value: "1.12" },
+      { label: "Burst Index", value: "0.34" },
+    ],
+    "Spectral Analysis": [
+      { label: "Peak Frequency", value: raw.result.includes("Hz") ? raw.result.split(":").pop()?.trim() || "—" : "—" },
+      { label: "Theta Power", value: "42.3%" },
+      { label: "Gamma Power", value: "18.7%" },
+    ],
+  };
+
+  return {
+    id: raw.id,
+    type: raw.type,
+    recording: raw.recording,
+    experimentName: "User Analysis",
+    status: raw.status === "completed" ? "completed" : raw.status === "running" ? "running" : "queued",
+    progress: raw.progress,
+    duration: raw.duration,
+    result: raw.result,
+    startedAt,
+    completedAt: raw.status === "completed" ? completedAt : "",
+    parameters: paramTemplates[raw.type] || [{ label: "Type", value: raw.type }],
+    outputs: raw.status === "completed" ? (outputTemplates[raw.type] || [{ label: "Result", value: raw.result }]) : [],
+    notes: `Analysis completed on recording ${raw.recording}. ${raw.result}.`,
+  };
+}
+
+/** Load a specific analysis job by ID, checking both hardcoded data and localStorage */
+function findAnalysisJob(id: string): AnalysisDetail | null {
+  // Check hardcoded first
+  if (mockAnalysisDb[id]) return mockAnalysisDb[id];
+  // Check localStorage
+  try {
+    const raw = localStorage.getItem(ANALYSIS_JOBS_KEY);
+    if (raw) {
+      const jobs = JSON.parse(raw) as { id: string; type: string; recording: string; recordingId?: string; status: string; progress: number; duration: string; result: string }[];
+      const stored = jobs.find((j) => j.id === id);
+      if (stored) return buildDetailFromStoredJob(stored);
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 const mockAnalysisDb: Record<string, AnalysisDetail> = {
   "a-001": {
     id: "a-001",
@@ -465,7 +586,7 @@ export default function AnalysisDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const job = id ? mockAnalysisDb[id] : null;
+  const job = id ? findAnalysisJob(id) : null;
 
   if (!job) {
     return (

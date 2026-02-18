@@ -17,6 +17,7 @@ const CHANNEL_MAP: Record<RedisChannel, WsChannel> = {
   'neural:agent_health': 'agent-status',
   'neural:alerts': 'agent-status',
   'neural:notifications': 'notifications',
+  'neural:telemetry': 'telemetry',
 };
 
 const REDIS_CHANNELS: RedisChannel[] = [
@@ -26,6 +27,7 @@ const REDIS_CHANNELS: RedisChannel[] = [
   'neural:agent_health',
   'neural:alerts',
   'neural:notifications',
+  'neural:telemetry',
 ];
 
 let subscriber: Redis | null = null;

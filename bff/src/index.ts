@@ -53,6 +53,10 @@ const WS_ROUTE_MAP: Record<string, { djangoPath: string; channel: WsChannel }> =
     djangoPath: '/ws/notifications/',
     channel: 'notifications',
   },
+  '/ws/telemetry': {
+    djangoPath: '/ws/telemetry/',
+    channel: 'telemetry',
+  },
 };
 
 // ─── Express App Setup ──────────────────────────────────────────────────────

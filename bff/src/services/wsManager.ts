@@ -17,6 +17,7 @@ class WsManager {
       ['chat', new Set()],
       ['spike-events', new Set()],
       ['notifications', new Set()],
+      ['telemetry', new Set()],
     ]);
   }
 
@@ -138,6 +139,7 @@ class WsManager {
       chat: this.getClientCount('chat'),
       'spike-events': this.getClientCount('spike-events'),
       notifications: this.getClientCount('notifications'),
+      telemetry: this.getClientCount('telemetry'),
       total: this.getTotalClientCount(),
     };
   }

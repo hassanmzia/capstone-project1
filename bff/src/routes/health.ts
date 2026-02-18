@@ -25,6 +25,7 @@ export function createHealthRouter(): Router {
         chat: clientCounts.chat,
         'spike-events': clientCounts['spike-events'],
         notifications: clientCounts.notifications,
+        telemetry: clientCounts.telemetry,
         total: clientCounts.total,
       },
       timestamp: new Date().toISOString(),
