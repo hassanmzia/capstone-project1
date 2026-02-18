@@ -38,6 +38,16 @@ export function useWebSocket({
   const [reconnectCount, setReconnectCount] = useState(0);
   const intentionalCloseRef = useRef(false);
 
+  // Store callbacks in refs so connect() has stable dependencies
+  const onMessageRef = useRef(onMessage);
+  const onOpenRef = useRef(onOpen);
+  const onCloseRef = useRef(onClose);
+  const onErrorRef = useRef(onError);
+  useEffect(() => { onMessageRef.current = onMessage; }, [onMessage]);
+  useEffect(() => { onOpenRef.current = onOpen; }, [onOpen]);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
+
   const clearReconnectTimer = useCallback(() => {
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
@@ -62,21 +72,21 @@ export function useWebSocket({
         setIsConnected(true);
         reconnectCountRef.current = 0;
         setReconnectCount(0);
-        onOpen?.(event);
+        onOpenRef.current?.(event);
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          onMessage?.(data);
+          onMessageRef.current?.(data);
         } catch {
-          onMessage?.(event.data);
+          onMessageRef.current?.(event.data);
         }
       };
 
       ws.onclose = (event) => {
         setIsConnected(false);
-        onClose?.(event);
+        onCloseRef.current?.(event);
 
         if (
           reconnect &&
@@ -91,14 +101,14 @@ export function useWebSocket({
       };
 
       ws.onerror = (event) => {
-        onError?.(event);
+        onErrorRef.current?.(event);
       };
 
       wsRef.current = ws;
     } catch (err) {
       console.error("WebSocket connection error:", err);
     }
-  }, [url, onMessage, onOpen, onClose, onError, reconnect, reconnectInterval, reconnectAttempts, clearReconnectTimer]);
+  }, [url, reconnect, reconnectInterval, reconnectAttempts, clearReconnectTimer]);
 
   const disconnect = useCallback(() => {
     intentionalCloseRef.current = true;
@@ -125,7 +135,9 @@ export function useWebSocket({
     return () => {
       disconnect();
     };
-  }, [autoConnect, connect, disconnect]);
+    // Only re-run when url or autoConnect changes, not on every callback change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoConnect, url]);
 
   return { sendMessage, connect, disconnect, isConnected, reconnectCount };
 }
