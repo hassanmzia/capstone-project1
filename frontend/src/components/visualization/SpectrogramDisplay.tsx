@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import { useNeuralData } from "@/contexts/NeuralDataContext";
-import { viridis, buildLUT, type ColormapFn, COLORMAPS } from "@/utils/colorMaps";
+import { inferno, buildLUT, type ColormapFn, COLORMAPS } from "@/utils/colorMaps";
 
 interface SpectrogramDisplayProps {
   className?: string;
@@ -28,7 +28,7 @@ export default function SpectrogramDisplay({
   windowSize: propWindowSize,
   hopSize: propHopSize,
   maxFrequency: propMaxFreq,
-  colormapName = "viridis",
+  colormapName: propColormap,
 }: SpectrogramDisplayProps) {
   const viz = useSelector((state: RootState) => state.visualization);
   const channel = propChannel ?? (viz.selectedChannels[0] ?? 0);
@@ -41,15 +41,17 @@ export default function SpectrogramDisplay({
   const columnsEmittedRef = useRef(0);
   const startTimeRef = useRef(Date.now());
 
-  const [windowSize, setWindowSize] = useState(propWindowSize ?? 512);
+  const [windowSize, setWindowSize] = useState(propWindowSize ?? 1024);
   const [hopSize] = useState(propHopSize ?? 256);
-  const [maxFrequency, setMaxFrequency] = useState(propMaxFreq ?? 5000);
-  const [dynamicRange, setDynamicRange] = useState(80); // dB
+  const [maxFrequency, setMaxFrequency] = useState(propMaxFreq ?? 500);
+  const [dynamicRange, setDynamicRange] = useState(50); // dB
+  const [colormapName, setColormapName] = useState(propColormap ?? "inferno");
+  const [contrastGamma] = useState(0.65); // <1 boosts mid-range brightness
 
   const { getLatestData } = useNeuralData();
 
   const colormap: ColormapFn = useMemo(
-    () => COLORMAPS[colormapName] ?? viridis,
+    () => COLORMAPS[colormapName] ?? inferno,
     [colormapName]
   );
   const lut = useMemo(() => buildLUT(colormap, 256), [colormap]);
@@ -203,7 +205,9 @@ export default function SpectrogramDisplay({
             // Flip Y: low freq at bottom
             const bin = row;
             const dB = spectrum[bin] ?? dBMin;
-            const normalized = Math.max(0, Math.min(1, (dB - dBMin) / (dBMax - dBMin)));
+            const linear = Math.max(0, Math.min(1, (dB - dBMin) / (dBMax - dBMin)));
+            // Gamma correction: <1 brightens mid-range, revealing more detail
+            const normalized = Math.pow(linear, contrastGamma);
             const lutIdx = Math.round(normalized * 255);
 
             const pixelIdx = ((imgH - 1 - row) * imgW + col) * 4;
@@ -220,6 +224,7 @@ export default function SpectrogramDisplay({
         if (offCtx) {
           offCtx.putImageData(imageData, 0, 0);
           ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
           ctx.drawImage(offscreen, margin.left, margin.top, plotW, plotH);
         }
       }
@@ -278,7 +283,7 @@ export default function SpectrogramDisplay({
       running = false;
       cancelAnimationFrame(animRef.current);
     };
-  }, [channel, windowSize, hopSize, sampleRate, maxFrequency, maxBin, dynamicRange, lut, getLatestData, computeFFTColumn]);
+  }, [channel, windowSize, hopSize, sampleRate, maxFrequency, maxBin, dynamicRange, contrastGamma, lut, getLatestData, computeFFTColumn]);
 
   return (
     <div className={`flex flex-col bg-neural-surface rounded-xl border border-neural-border ${className}`}>
@@ -313,10 +318,11 @@ export default function SpectrogramDisplay({
               onChange={(e) => setMaxFrequency(Number(e.target.value))}
               className="bg-neural-surface-alt border border-neural-border rounded px-1 py-0.5 text-[10px] text-neural-text-primary"
             >
+              <option value={300}>300 Hz</option>
+              <option value={500}>500 Hz</option>
               <option value={1000}>1 kHz</option>
               <option value={2000}>2 kHz</option>
               <option value={5000}>5 kHz</option>
-              <option value={10000}>10 kHz</option>
               <option value={nyquist}>Nyquist</option>
             </select>
           </div>
@@ -327,10 +333,24 @@ export default function SpectrogramDisplay({
               onChange={(e) => setDynamicRange(Number(e.target.value))}
               className="bg-neural-surface-alt border border-neural-border rounded px-1 py-0.5 text-[10px] text-neural-text-primary"
             >
+              <option value={30}>30 dB</option>
               <option value={40}>40 dB</option>
+              <option value={50}>50 dB</option>
               <option value={60}>60 dB</option>
               <option value={80}>80 dB</option>
-              <option value={100}>100 dB</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-neural-text-muted">Color:</span>
+            <select
+              value={colormapName}
+              onChange={(e) => setColormapName(e.target.value)}
+              className="bg-neural-surface-alt border border-neural-border rounded px-1 py-0.5 text-[10px] text-neural-text-primary"
+            >
+              <option value="inferno">Inferno</option>
+              <option value="plasma">Plasma</option>
+              <option value="viridis">Viridis</option>
+              <option value="turbo">Turbo</option>
             </select>
           </div>
         </div>
