@@ -84,7 +84,7 @@ export default function WaveformDisplay({
     amplitude: string;
   } | null>(null);
 
-  const { getLatestData, isConnected, bufferFill, dataRate } = useDataStream({
+  const { getLatestData, isConnected, dataRate } = useDataStream({
     channelCount: 64,
     targetFps: 60,
   });

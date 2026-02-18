@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { useSpikeEvents } from "@/hooks/useSpikeEvents";
-import { neuralActivity, viridis, createCSSGradient, type ColormapFn, COLORMAPS, buildLUT } from "@/utils/colorMaps";
+import { neuralActivity, createCSSGradient, type ColormapFn, COLORMAPS, buildLUT } from "@/utils/colorMaps";
 import { siteToRowCol, rowColToSite, getSiteLabel } from "@/utils/siteConversion";
 
 interface SpikeHeatmapProps {
@@ -227,7 +227,7 @@ export default function SpikeHeatmap({
   );
 
   const handleMouseUp = useCallback(
-    (e: React.MouseEvent) => {
+    (_e: React.MouseEvent) => {
       if (isDragging && dragStart && dragEnd) {
         const r0 = Math.min(dragStart.row, dragEnd.row);
         const r1 = Math.max(dragStart.row, dragEnd.row);

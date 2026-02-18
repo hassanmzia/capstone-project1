@@ -7,7 +7,6 @@ import {
   Play,
   Calendar,
   Clock,
-  Zap,
   FileText,
   Filter,
   SortDesc,

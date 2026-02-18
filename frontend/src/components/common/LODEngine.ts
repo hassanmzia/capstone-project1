@@ -113,7 +113,6 @@ export function autoDecimate(data: Float32Array, viewportWidth: number): Float32
  */
 export class LODCache {
   private levels: Map<number, Float32Array> = new Map();
-  private sourceLength: number = 0;
 
   /**
    * Build LOD levels from source data.
@@ -121,9 +120,7 @@ export class LODCache {
    */
   build(data: Float32Array, maxLevels: number = 8): void {
     this.levels.clear();
-    this.sourceLength = data.length;
 
-    let current = data;
     for (let level = 0; level < maxLevels; level++) {
       const factor = 1 << (level + 1);
       const targetPoints = Math.ceil(data.length / factor);
@@ -131,7 +128,6 @@ export class LODCache {
 
       const decimated = decimateMinMax(data, targetPoints);
       this.levels.set(factor, decimated);
-      current = decimated;
     }
   }
 

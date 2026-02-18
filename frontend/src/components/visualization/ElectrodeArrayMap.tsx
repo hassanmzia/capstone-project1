@@ -4,10 +4,10 @@
  * Click/shift-click/drag selection with right-click context menu.
  */
 
-import { useCallback, useState, useMemo, useRef, useEffect } from "react";
+import React, { useCallback, useState, useMemo, useRef, useEffect } from "react";
 import { useSpikeEvents } from "@/hooks/useSpikeEvents";
-import { siteToRowCol, rowColToSite, getSiteLabel, ARRAY_ROWS, ARRAY_COLS } from "@/utils/siteConversion";
-import { neuralActivity, viridis, coolwarm, type ColormapFn, COLORMAPS } from "@/utils/colorMaps";
+import { rowColToSite, getSiteLabel, ARRAY_ROWS, ARRAY_COLS } from "@/utils/siteConversion";
+import { neuralActivity, viridis, coolwarm, type ColormapFn } from "@/utils/colorMaps";
 
 type OverlayMode = "spikeRate" | "dcLevel" | "impedance" | "noiseLevel" | "selection";
 type SiteStatus = "active" | "noisy" | "dead" | "normal";
@@ -244,7 +244,7 @@ export default function ElectrodeArrayMap({
 
   // Build the electrode grid elements
   const electrodes = useMemo(() => {
-    const elements: JSX.Element[] = [];
+    const elements: React.ReactElement[] = [];
     for (let ri = 0; ri < displaySize; ri++) {
       for (let ci = 0; ci < displaySize; ci++) {
         const row = ri * step;

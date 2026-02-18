@@ -134,7 +134,6 @@ export function useSpikeEvents(config: UseSpikeEventsConfig = {}): UseSpikeEvent
     const interval = setInterval(() => {
       const rates = spikeRateRef.current;
       const recent = recentCountsRef.current;
-      const windowSec = rateWindowMs / 1000;
 
       let active = 0;
 
