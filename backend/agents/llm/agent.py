@@ -378,22 +378,27 @@ class LLMAgent(BaseAgent):
     async def _stream_chat(
         self, request: ChatRequest
     ) -> AsyncGenerator[str, None]:
-        """Stream the chat response as Server-Sent Events."""
+        """Stream the chat response as Server-Sent Events.
+
+        Every pre-streaming step (Redis, router, RAG) is wrapped in
+        try/except so that a failure in any sub-system never prevents
+        the user from receiving *some* response.
+        """
         session_id = request.session_id or str(uuid.uuid4())
 
-        # Load session context
-        if self._short_term:
-            session_ctx = await self._short_term.get_context(session_id)
-            previous_messages = session_ctx.get("messages", [])
-        else:
-            previous_messages = []
+        # ── 1. Load session context (graceful fallback) ──────────────
+        previous_messages: list = []
+        try:
+            if self._short_term:
+                session_ctx = await self._short_term.get_context(session_id)
+                previous_messages = session_ctx.get("messages", [])
+        except Exception as exc:
+            logger.warning("Failed to load session context: %s", exc)
 
         all_messages = previous_messages + [
             {"role": m.role, "content": m.content} for m in request.messages
         ]
 
-        # For streaming, call Ollama directly with stream=True
-        # after running router + RAG retrieval
         initial_state: NeuralAssistantState = {
             "messages": all_messages,
             "system_context": request.system_context or {},
@@ -405,17 +410,25 @@ class LLMAgent(BaseAgent):
         if request.user_id:
             initial_state["system_context"]["user_id"] = request.user_id
 
-        # Use the graph for pre-processing (router + retrieval) but stream the final response
+        # ── 2. Route intent (graceful fallback to "chat") ────────────
         from .nodes.router import route_intent
         from .nodes.rag_query import retrieve_context
         from .nodes.responder import BASE_SYSTEM_PROMPT
 
-        intent = await route_intent(initial_state)
+        intent = "chat"
+        try:
+            intent = await route_intent(initial_state)
+        except Exception as exc:
+            logger.warning("Router failed, defaulting to 'chat': %s", exc)
 
-        if intent == "rag_query" or intent == "report":
-            initial_state = await retrieve_context(initial_state)
+        # ── 3. RAG retrieval if needed (graceful fallback) ───────────
+        if intent in ("rag_query", "report"):
+            try:
+                initial_state = await retrieve_context(initial_state)
+            except Exception as exc:
+                logger.warning("RAG retrieval failed, skipping: %s", exc)
 
-        # Build system prompt with context
+        # ── 4. Build system prompt ───────────────────────────────────
         system_prompt = BASE_SYSTEM_PROMPT
         rag_results = initial_state.get("rag_results", [])
         if rag_results:
@@ -435,8 +448,8 @@ class LLMAgent(BaseAgent):
             if role in ("user", "assistant"):
                 llm_messages.append({"role": role, "content": content})
 
-        # Stream from the selected provider (Ollama / OpenAI / Anthropic)
-        model_id = request.model  # e.g. "openai/gpt-4o" or "ollama/deepseek-r1:7b"
+        # ── 5. Stream from the selected provider ─────────────────────
+        model_id = request.model
         full_response = ""
         try:
             async for token in provider_stream_chat(
@@ -448,16 +461,29 @@ class LLMAgent(BaseAgent):
                 yield f"data: {json.dumps({'token': token, 'session_id': session_id})}\n\n"
         except Exception as exc:
             error_msg = f"Streaming error: {exc}"
-            yield f"data: {json.dumps({'error': error_msg, 'session_id': session_id})}\n\n"
+            logger.error("Provider streaming failed: %s", exc)
+            yield f"data: {json.dumps({'token': error_msg, 'session_id': session_id})}\n\n"
             full_response = error_msg
 
-        # Persist updated conversation
+        # If the provider returned nothing, send a fallback message
+        if not full_response.strip():
+            fallback = (
+                "I'm sorry, I couldn't generate a response. "
+                "Please check that the language model service is running and try again."
+            )
+            yield f"data: {json.dumps({'token': fallback, 'session_id': session_id})}\n\n"
+            full_response = fallback
+
+        # ── 6. Persist conversation (graceful fallback) ──────────────
         all_messages.append({"role": "assistant", "content": full_response})
-        if self._short_term:
-            await self._short_term.store_context(session_id, {
-                "messages": all_messages,
-                "system_context": initial_state.get("system_context", {}),
-            })
+        try:
+            if self._short_term:
+                await self._short_term.store_context(session_id, {
+                    "messages": all_messages,
+                    "system_context": initial_state.get("system_context", {}),
+                })
+        except Exception as exc:
+            logger.warning("Failed to persist session: %s", exc)
 
         yield f"data: {json.dumps({'done': True, 'session_id': session_id})}\n\n"
         yield "data: [DONE]\n\n"
