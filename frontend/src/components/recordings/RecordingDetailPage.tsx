@@ -425,13 +425,22 @@ export default function RecordingDetailPage() {
 
         <div className="flex items-center gap-2">
           {rec.status === "completed" && (
-            <button
-              onClick={handleAnalyzeInVisualizer}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/15 text-neural-accent-cyan border border-neural-accent-cyan/30 hover:bg-neural-accent-cyan/25 neural-transition"
-            >
-              <Eye className="w-4 h-4" />
-              Analyze in Visualizer
-            </button>
+            <>
+              <button
+                onClick={handleAnalyzeInVisualizer}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/15 text-neural-accent-cyan border border-neural-accent-cyan/30 hover:bg-neural-accent-cyan/25 neural-transition"
+              >
+                <Eye className="w-4 h-4" />
+                Analyze in Visualizer
+              </button>
+              <button
+                onClick={() => navigate(`/analysis/new?recording=${rec.id}`)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-green/15 text-neural-accent-green border border-neural-accent-green/30 hover:bg-neural-accent-green/25 neural-transition"
+              >
+                <FlaskConical className="w-4 h-4" />
+                Run Analysis
+              </button>
+            </>
           )}
           <button
             onClick={() => alert(`Downloading ${rec.name} (${rec.fileSize})...`)}

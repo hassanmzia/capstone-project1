@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   FlaskConical,
@@ -16,7 +16,14 @@ import {
   Edit3,
   Plus,
   X,
+  Circle,
+  Eye,
+  BarChart3,
+  Activity,
+  Zap,
 } from "lucide-react";
+import { useRecordingSession } from "@/contexts/RecordingSessionContext";
+import type { AnalysisJob } from "@/components/analysis/AnalysisPage";
 
 interface ExperimentData {
   id: string;
@@ -94,11 +101,77 @@ const mockExperimentsDb: Record<string, ExperimentData> = {
   },
 };
 
-const mockRecordings = [
-  { id: "rec-042", name: "session_042", date: "2026-02-18 09:15", duration: "15:32", spikes: 48291, status: "completed" },
-  { id: "rec-041", name: "session_041", date: "2026-02-17 14:22", duration: "30:10", spikes: 95100, status: "completed" },
-  { id: "rec-040", name: "session_040", date: "2026-02-16 11:05", duration: "10:00", spikes: 22430, status: "completed" },
+interface RecordingEntry {
+  id: string;
+  name: string;
+  experimentName: string;
+  date: string;
+  duration: string;
+  spikeCount: number;
+  channels: number;
+  fileSize: string;
+  format: string;
+  status: string;
+  sampleRate?: string;
+}
+
+/** Seed recordings mapped to their experiments */
+const seedRecordings: RecordingEntry[] = [
+  { id: "rec-042", name: "session_042", experimentName: "Hippocampal CA1 Place Cell Study", date: "2026-02-18 09:15", duration: "15:32", spikeCount: 48291, channels: 64, fileSize: "2.4 GB", format: "HDF5", status: "completed", sampleRate: "30000" },
+  { id: "rec-041", name: "session_041", experimentName: "Hippocampal CA1 Place Cell Study", date: "2026-02-17 14:22", duration: "30:10", spikeCount: 95100, channels: 64, fileSize: "4.8 GB", format: "HDF5", status: "completed", sampleRate: "30000" },
+  { id: "rec-040", name: "session_040", experimentName: "Cortical Spike Timing Analysis", date: "2026-02-16 11:05", duration: "10:00", spikeCount: 22430, channels: 32, fileSize: "1.1 GB", format: "NWB", status: "completed", sampleRate: "30000" },
+  { id: "rec-039", name: "session_039", experimentName: "Cortical Spike Timing Analysis", date: "2026-02-15 16:40", duration: "05:45", spikeCount: 0, channels: 32, fileSize: "540 MB", format: "NWB", status: "processing", sampleRate: "30000" },
+  { id: "rec-038", name: "session_038", experimentName: "Retinal Ganglion Response Mapping", date: "2026-02-14 10:30", duration: "20:00", spikeCount: 67800, channels: 128, fileSize: "6.2 GB", format: "HDF5", status: "completed", sampleRate: "20000" },
+  { id: "rec-037", name: "session_037_failed", experimentName: "Retinal Ganglion Response Mapping", date: "2026-02-14 09:00", duration: "02:15", spikeCount: 1200, channels: 128, fileSize: "320 MB", format: "RAW", status: "error", sampleRate: "20000" },
 ];
+
+/** Load all recordings (seed + localStorage) for a given experiment name */
+function loadRecordingsForExperiment(experimentName: string): RecordingEntry[] {
+  const seedIds = new Set(seedRecordings.map((r) => r.id));
+  let allRecordings = [...seedRecordings];
+
+  try {
+    const raw = localStorage.getItem("cnea_recordings");
+    if (raw) {
+      const stored: RecordingEntry[] = JSON.parse(raw);
+      const userRecs = stored.filter((r) => !seedIds.has(r.id));
+      allRecordings = [...userRecs, ...allRecordings];
+    }
+  } catch { /* ignore */ }
+
+  return allRecordings.filter((r) => r.experimentName === experimentName);
+}
+
+/** Load analysis jobs for a given experiment's recordings */
+function loadAnalysisForExperiment(recordings: RecordingEntry[]): AnalysisJob[] {
+  const recNames = new Set(recordings.map((r) => r.name));
+  const recIds = new Set(recordings.map((r) => r.id));
+
+  const seedJobs: AnalysisJob[] = [
+    { id: "a-001", type: "Spike Sorting", recording: "session_042", recordingId: "rec-042", status: "completed", progress: 100, duration: "4m 32s", result: "3,847 units classified" },
+    { id: "a-002", type: "Burst Detection", recording: "session_041", recordingId: "rec-041", status: "completed", progress: 100, duration: "1m 18s", result: "142 bursts detected" },
+    { id: "a-003", type: "PCA Analysis", recording: "session_042", recordingId: "rec-042", status: "completed", progress: 100, duration: "3m 45s", result: "3 components, 85.2% variance" },
+    { id: "a-004", type: "Cross-Correlation", recording: "session_040", recordingId: "rec-040", status: "completed", progress: 100, duration: "5m 12s", result: "48 significant pairs" },
+  ];
+
+  let allJobs = seedJobs;
+  try {
+    const raw = localStorage.getItem("cnea_analysis_jobs");
+    if (raw) {
+      const userJobs: AnalysisJob[] = JSON.parse(raw);
+      allJobs = [...userJobs, ...seedJobs];
+    }
+  } catch { /* ignore */ }
+
+  return allJobs.filter((j) => recNames.has(j.recording) || (j.recordingId && recIds.has(j.recordingId)));
+}
+
+/** Parse file size string to MB */
+function parseSizeMB(s: string): number {
+  if (s.includes("GB")) return parseFloat(s) * 1024;
+  if (s.includes("MB")) return parseFloat(s);
+  return 0;
+}
 
 function statusBadge(status: string) {
   const classes: Record<string, string> = {
@@ -124,6 +197,7 @@ function statusBadge(status: string) {
 export default function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { startPlayback } = useRecordingSession();
   const isNew = id === "new";
 
   const existing = id && !isNew ? mockExperimentsDb[id] : null;
@@ -145,6 +219,41 @@ export default function ExperimentDetailPage() {
   );
   const [tagInput, setTagInput] = useState("");
   const [saved, setSaved] = useState(false);
+
+  // Load real recordings and analysis for this experiment
+  const experimentRecordings = useMemo(() => {
+    const name = existing?.name || form.name;
+    return name ? loadRecordingsForExperiment(name) : [];
+  }, [existing?.name, form.name]);
+
+  const experimentAnalysis = useMemo(() => {
+    return experimentRecordings.length > 0 ? loadAnalysisForExperiment(experimentRecordings) : [];
+  }, [experimentRecordings]);
+
+  // Compute real statistics
+  const stats = useMemo(() => {
+    const completed = experimentRecordings.filter((r) => r.status === "completed");
+    const totalSpikes = completed.reduce((sum, r) => sum + r.spikeCount, 0);
+    const totalSec = completed.reduce((sum, r) => {
+      const parts = r.duration.split(":");
+      return sum + parseInt(parts[0]) * 60 + parseInt(parts[1]);
+    }, 0);
+    const totalMins = Math.floor(totalSec / 60);
+    const totalRemSec = totalSec % 60;
+    const totalSizeMB = experimentRecordings.reduce((sum, r) => sum + parseSizeMB(r.fileSize), 0);
+    const avgFiringRate = totalSec > 0 && completed.length > 0
+      ? (totalSpikes / totalSec / completed[0].channels).toFixed(1)
+      : "0";
+
+    return {
+      totalSpikes,
+      totalDuration: `${String(totalMins).padStart(2, "0")}:${String(totalRemSec).padStart(2, "0")}`,
+      avgFiringRate: `${avgFiringRate} Hz`,
+      dataSize: totalSizeMB >= 1024 ? `${(totalSizeMB / 1024).toFixed(1)} GB` : `${Math.round(totalSizeMB)} MB`,
+      completedCount: completed.length,
+      totalCount: experimentRecordings.length,
+    };
+  }, [experimentRecordings]);
 
   if (!existing && !isNew) {
     return (
@@ -419,15 +528,68 @@ export default function ExperimentDetailPage() {
             </div>
           </div>
 
-          {/* Sidebar: Recordings */}
+          {/* Sidebar: Recordings + Actions + Stats + Analysis */}
           <div className="space-y-4">
+            {/* Quick actions */}
+            {!isNew && (
+              <div className="bg-neural-surface rounded-xl border border-neural-border p-4">
+                <h2 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider mb-3">Actions</h2>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => navigate("/recordings")}
+                    className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm bg-neural-accent-green/10 text-neural-accent-green border border-neural-accent-green/20 hover:bg-neural-accent-green/20 neural-transition"
+                  >
+                    <Circle className="w-3.5 h-3.5" />
+                    Start Recording
+                  </button>
+                  {stats.completedCount > 0 && (
+                    <>
+                      <button
+                        onClick={() => {
+                          const completed = experimentRecordings.find((r) => r.status === "completed");
+                          if (completed) navigate(`/analysis/new?recording=${completed.id}`);
+                        }}
+                        className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm bg-neural-accent-purple/10 text-neural-accent-purple border border-neural-accent-purple/20 hover:bg-neural-accent-purple/20 neural-transition"
+                      >
+                        <BarChart3 className="w-3.5 h-3.5" />
+                        Run Analysis
+                      </button>
+                      <button
+                        onClick={() => {
+                          const completed = experimentRecordings.find((r) => r.status === "completed");
+                          if (completed) {
+                            const sr = completed.sampleRate ? parseInt(completed.sampleRate) : 30000;
+                            startPlayback({
+                              recordingId: completed.id,
+                              name: completed.name,
+                              experimentName: completed.experimentName,
+                              channels: completed.channels,
+                              sampleRate: sr,
+                              duration: completed.duration,
+                              spikeCount: completed.spikeCount,
+                            });
+                            navigate("/visualization");
+                          }
+                        }}
+                        className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm bg-neural-accent-cyan/10 text-neural-accent-cyan border border-neural-accent-cyan/20 hover:bg-neural-accent-cyan/20 neural-transition"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        Open in Visualizer
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Recordings */}
             <div className="bg-neural-surface rounded-xl border border-neural-border p-5">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-neural-text-primary">Recent Recordings</h2>
-                <span className="text-xs text-neural-text-muted">{data.recordingCount} total</span>
+                <h2 className="text-sm font-semibold text-neural-text-primary">Recordings</h2>
+                <span className="text-xs text-neural-text-muted">{experimentRecordings.length} total</span>
               </div>
 
-              {isNew || data.recordingCount === 0 ? (
+              {experimentRecordings.length === 0 ? (
                 <div className="text-center py-8">
                   <HardDrive className="w-8 h-8 text-neural-text-muted mx-auto mb-2" />
                   <p className="text-xs text-neural-text-muted">No recordings yet</p>
@@ -435,14 +597,19 @@ export default function ExperimentDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {mockRecordings.map((rec) => (
+                  {experimentRecordings.slice(0, 5).map((rec) => (
                     <div
                       key={rec.id}
+                      onClick={() => navigate(`/recordings/${rec.id}`)}
                       className="p-3 rounded-lg bg-neural-surface-alt border border-neural-border hover:border-neural-border-bright neural-transition cursor-pointer"
                     >
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-mono text-neural-text-primary">{rec.name}</span>
-                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-neural-accent-green/20 text-neural-accent-green">
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                          rec.status === "completed" ? "bg-neural-accent-green/20 text-neural-accent-green"
+                          : rec.status === "processing" ? "bg-neural-accent-amber/20 text-neural-accent-amber"
+                          : "bg-neural-accent-red/20 text-neural-accent-red"
+                        }`}>
                           {rec.status}
                         </span>
                       </div>
@@ -450,36 +617,92 @@ export default function ExperimentDetailPage() {
                         <span className="flex items-center gap-1"><Calendar className="w-2.5 h-2.5" />{rec.date}</span>
                         <span className="flex items-center gap-1"><Clock className="w-2.5 h-2.5" />{rec.duration}</span>
                       </div>
-                      <div className="text-[11px] text-neural-accent-cyan font-mono mt-1">
-                        {rec.spikes.toLocaleString()} spikes
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-[11px] text-neural-accent-cyan font-mono">
+                          {rec.spikeCount.toLocaleString()} spikes
+                        </span>
+                        <span className="text-[10px] text-neural-text-muted">{rec.channels}ch &middot; {rec.fileSize}</span>
                       </div>
                     </div>
                   ))}
+                  {experimentRecordings.length > 5 && (
+                    <button
+                      onClick={() => navigate("/recordings")}
+                      className="w-full text-center text-xs text-neural-accent-cyan hover:text-neural-accent-cyan/80 py-2 neural-transition"
+                    >
+                      View all {experimentRecordings.length} recordings →
+                    </button>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Quick stats */}
-            {!isNew && data.recordingCount > 0 && (
+            {/* Statistics (computed from real data) */}
+            {experimentRecordings.length > 0 && (
               <div className="bg-neural-surface rounded-xl border border-neural-border p-5">
-                <h2 className="text-sm font-semibold text-neural-text-primary mb-4">Statistics</h2>
+                <h2 className="text-sm font-semibold text-neural-text-primary mb-4 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-neural-text-muted" />
+                  Statistics
+                </h2>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-neural-text-muted">Total Spikes</span>
-                    <span className="text-sm font-mono text-neural-accent-cyan">165,821</span>
+                    <span className="text-xs text-neural-text-muted flex items-center gap-1"><Zap className="w-3 h-3" /> Total Spikes</span>
+                    <span className="text-sm font-mono text-neural-accent-cyan">{stats.totalSpikes.toLocaleString()}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-neural-text-muted">Total Duration</span>
-                    <span className="text-sm font-mono text-neural-text-primary">55:42</span>
+                    <span className="text-xs text-neural-text-muted flex items-center gap-1"><Clock className="w-3 h-3" /> Total Duration</span>
+                    <span className="text-sm font-mono text-neural-text-primary">{stats.totalDuration}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-neural-text-muted">Avg Firing Rate</span>
-                    <span className="text-sm font-mono text-neural-text-primary">49.6 Hz</span>
+                    <span className="text-sm font-mono text-neural-text-primary">{stats.avgFiringRate}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-neural-text-muted">Data Size</span>
-                    <span className="text-sm font-mono text-neural-text-primary">12.4 GB</span>
+                    <span className="text-xs text-neural-text-muted flex items-center gap-1"><HardDrive className="w-3 h-3" /> Data Size</span>
+                    <span className="text-sm font-mono text-neural-text-primary">{stats.dataSize}</span>
                   </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-neural-text-muted">Recordings</span>
+                    <span className="text-sm font-mono text-neural-text-primary">{stats.completedCount} completed / {stats.totalCount} total</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Analysis Jobs */}
+            {experimentAnalysis.length > 0 && (
+              <div className="bg-neural-surface rounded-xl border border-neural-border p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold text-neural-text-primary flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-neural-text-muted" />
+                    Analysis Results
+                  </h2>
+                  <span className="text-xs text-neural-text-muted">{experimentAnalysis.length} jobs</span>
+                </div>
+                <div className="space-y-2">
+                  {experimentAnalysis.map((job) => (
+                    <div
+                      key={job.id}
+                      onClick={() => job.id.startsWith("a-0") ? navigate(`/analysis/${job.id}`) : undefined}
+                      className={`p-3 rounded-lg bg-neural-surface-alt border border-neural-border ${job.id.startsWith("a-0") ? "hover:border-neural-border-bright cursor-pointer" : ""} neural-transition`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-neural-text-primary">{job.type}</span>
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                          job.status === "completed" ? "bg-neural-accent-green/20 text-neural-accent-green"
+                          : "bg-neural-accent-cyan/20 text-neural-accent-cyan"
+                        }`}>
+                          {job.status}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-neural-text-muted">
+                        {job.recording} &middot; {job.duration}
+                      </div>
+                      {job.result && (
+                        <div className="text-[11px] text-neural-accent-green mt-1">{job.result}</div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

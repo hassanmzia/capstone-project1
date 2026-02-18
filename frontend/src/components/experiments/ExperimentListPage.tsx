@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FlaskConical,
@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Clock,
   FileText,
+  HardDrive,
 } from "lucide-react";
 
 interface MockExperiment {
@@ -26,7 +27,7 @@ interface MockExperiment {
   tags: string[];
 }
 
-const mockExperiments: MockExperiment[] = [
+const seedExperiments: MockExperiment[] = [
   {
     id: "exp-001",
     name: "Hippocampal CA1 Place Cell Study",
@@ -79,6 +80,21 @@ const mockExperiments: MockExperiment[] = [
   },
 ];
 
+/** Count recordings per experiment from localStorage */
+function countRecordingsPerExperiment(): Record<string, number> {
+  const counts: Record<string, number> = {};
+  try {
+    const raw = localStorage.getItem("cnea_recordings");
+    if (raw) {
+      const recs = JSON.parse(raw) as { experimentName: string }[];
+      for (const r of recs) {
+        counts[r.experimentName] = (counts[r.experimentName] || 0) + 1;
+      }
+    }
+  } catch { /* ignore */ }
+  return counts;
+}
+
 function statusIcon(status: string) {
   switch (status) {
     case "active":
@@ -114,7 +130,16 @@ export default function ExperimentListPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const filtered = mockExperiments.filter((exp) => {
+  // Merge seed experiments with real recording counts
+  const experiments = useMemo(() => {
+    const recCounts = countRecordingsPerExperiment();
+    return seedExperiments.map((exp) => ({
+      ...exp,
+      recordingCount: recCounts[exp.name] ?? exp.recordingCount,
+    }));
+  }, []);
+
+  const filtered = experiments.filter((exp) => {
     const matchesSearch =
       search === "" ||
       exp.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -203,7 +228,7 @@ export default function ExperimentListPage() {
                       {exp.createdAt}
                     </span>
                     <span>{exp.owner}</span>
-                    <span>{exp.recordingCount} recordings</span>
+                    <span className="flex items-center gap-1"><HardDrive className="w-3 h-3" />{exp.recordingCount} recordings</span>
                     <div className="flex gap-1">
                       {exp.tags.map((tag) => (
                         <span

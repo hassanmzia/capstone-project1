@@ -13,12 +13,36 @@ import {
   Sigma,
 } from "lucide-react";
 
-const analysisJobs = [
-  { id: "a-001", type: "Spike Sorting", recording: "session_042", status: "completed", progress: 100, duration: "4m 32s", result: "3,847 units classified" },
-  { id: "a-002", type: "Burst Detection", recording: "session_041", status: "completed", progress: 100, duration: "1m 18s", result: "142 bursts detected" },
-  { id: "a-003", type: "PCA Analysis", recording: "session_042", status: "completed", progress: 100, duration: "3m 45s", result: "3 components, 85.2% variance" },
-  { id: "a-004", type: "Cross-Correlation", recording: "session_040", status: "completed", progress: 100, duration: "5m 12s", result: "48 significant pairs" },
+export interface AnalysisJob {
+  id: string;
+  type: string;
+  recording: string;
+  recordingId?: string;
+  status: "completed" | "running" | "queued";
+  progress: number;
+  duration: string;
+  result: string;
+}
+
+const seedJobs: AnalysisJob[] = [
+  { id: "a-001", type: "Spike Sorting", recording: "session_042", recordingId: "rec-042", status: "completed", progress: 100, duration: "4m 32s", result: "3,847 units classified" },
+  { id: "a-002", type: "Burst Detection", recording: "session_041", recordingId: "rec-041", status: "completed", progress: 100, duration: "1m 18s", result: "142 bursts detected" },
+  { id: "a-003", type: "PCA Analysis", recording: "session_042", recordingId: "rec-042", status: "completed", progress: 100, duration: "3m 45s", result: "3 components, 85.2% variance" },
+  { id: "a-004", type: "Cross-Correlation", recording: "session_040", recordingId: "rec-040", status: "completed", progress: 100, duration: "5m 12s", result: "48 significant pairs" },
 ];
+
+const ANALYSIS_JOBS_KEY = "cnea_analysis_jobs";
+
+function loadAnalysisJobs(): AnalysisJob[] {
+  try {
+    const raw = localStorage.getItem(ANALYSIS_JOBS_KEY);
+    if (raw) {
+      const userJobs: AnalysisJob[] = JSON.parse(raw);
+      return [...userJobs, ...seedJobs];
+    }
+  } catch { /* ignore */ }
+  return seedJobs;
+}
 
 const analysisTypes = [
   { name: "Spike Sorting", description: "Automated spike detection and unit classification", icon: GitBranch, color: "text-neural-accent-cyan" },
@@ -32,6 +56,7 @@ const analysisTypes = [
 export default function AnalysisPage() {
   const navigate = useNavigate();
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [analysisJobs] = useState<AnalysisJob[]>(loadAnalysisJobs);
 
   return (
     <div className="flex flex-col gap-4 h-full">
