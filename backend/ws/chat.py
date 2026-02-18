@@ -97,6 +97,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if model:
             request_body["model"] = model
 
+        # Send an immediate status so the frontend knows the message was received
+        await self.send(
+            text_data=json.dumps({"type": "chat.status", "status": "processing"})
+        )
+
         logger.info("Forwarding to agent-llm: %s", chat_url)
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0)) as client:
