@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FlaskConical,
   Search,
@@ -109,29 +110,11 @@ function statusBadgeClass(status: string) {
 }
 
 export default function ExperimentListPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [experiments, setExperiments] = useState(mockExperiments);
 
-  const handleNewExperiment = useCallback(() => {
-    const id = `exp-${String(experiments.length + 1).padStart(3, "0")}`;
-    setExperiments((prev) => [
-      {
-        id,
-        name: `New Experiment ${prev.length + 1}`,
-        description: "Click to configure this experiment",
-        status: "draft" as const,
-        owner: "Researcher",
-        createdAt: new Date().toISOString().slice(0, 10),
-        recordingCount: 0,
-        tags: [],
-      },
-      ...prev,
-    ]);
-    setStatusFilter("all");
-  }, [experiments.length]);
-
-  const filtered = experiments.filter((exp) => {
+  const filtered = mockExperiments.filter((exp) => {
     const matchesSearch =
       search === "" ||
       exp.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -182,7 +165,7 @@ export default function ExperimentListPage() {
           </div>
 
           <button
-            onClick={handleNewExperiment}
+            onClick={() => navigate("/experiments/new")}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition"
           >
             <Plus className="w-4 h-4" />
@@ -196,6 +179,7 @@ export default function ExperimentListPage() {
         {filtered.map((exp) => (
           <div
             key={exp.id}
+            onClick={() => navigate(`/experiments/${exp.id}`)}
             className="bg-neural-surface rounded-xl border border-neural-border p-4 hover:border-neural-border-bright neural-transition cursor-pointer group"
           >
             <div className="flex items-start justify-between">
@@ -237,7 +221,7 @@ export default function ExperimentListPage() {
 
               <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 neural-transition">
                 <button
-                  onClick={() => alert(`Options for ${exp.name}`)}
+                  onClick={(e) => { e.stopPropagation(); alert(`Options for ${exp.name}`); }}
                   className="p-1.5 rounded-lg hover:bg-neural-surface-alt text-neural-text-muted hover:text-neural-text-primary"
                 >
                   <MoreVertical className="w-4 h-4" />
