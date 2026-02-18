@@ -410,25 +410,12 @@ class LLMAgent(BaseAgent):
         if request.user_id:
             initial_state["system_context"]["user_id"] = request.user_id
 
-        # ── 2. Route intent (graceful fallback to "chat") ────────────
-        from .nodes.router import route_intent
-        from .nodes.rag_query import retrieve_context
         from .nodes.responder import BASE_SYSTEM_PROMPT
 
-        intent = "chat"
-        try:
-            intent = await route_intent(initial_state)
-        except Exception as exc:
-            logger.warning("Router failed, defaulting to 'chat': %s", exc)
-
-        # ── 3. RAG retrieval if needed (graceful fallback) ───────────
-        if intent in ("rag_query", "report"):
-            try:
-                initial_state = await retrieve_context(initial_state)
-            except Exception as exc:
-                logger.warning("RAG retrieval failed, skipping: %s", exc)
-
-        # ── 4. Build system prompt ───────────────────────────────────
+        # ── 2. Build system prompt (skip router for streaming) ───────
+        # The intent router makes a separate LLM call that adds 15-30s
+        # latency.  For the streaming path we go straight to the LLM
+        # and let it decide how to respond naturally.
         system_prompt = BASE_SYSTEM_PROMPT
         rag_results = initial_state.get("rag_results", [])
         if rag_results:
