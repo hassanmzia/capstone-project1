@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -14,8 +14,10 @@ import {
   Zap,
   BarChart3,
   Layers,
+  Eye,
 } from "lucide-react";
 import type { MockRecording } from "./RecordingBrowserPage";
+import { useRecordingSession } from "@/contexts/RecordingSessionContext";
 
 interface RecordingDetail {
   id: string;
@@ -370,8 +372,24 @@ function ChannelMapGrid({ channels, snr }: { channels: number; snr: string }) {
 export default function RecordingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { startPlayback } = useRecordingSession();
 
   const rec = id ? findRecording(id) : null;
+
+  const handleAnalyzeInVisualizer = useCallback(() => {
+    if (!rec) return;
+    const sr = parseInt(rec.sampleRate.replace(/[^0-9]/g, "")) || 30000;
+    startPlayback({
+      recordingId: rec.id,
+      name: rec.name,
+      experimentName: rec.experimentName,
+      channels: rec.channels,
+      sampleRate: sr,
+      duration: rec.duration,
+      spikeCount: rec.spikeCount,
+    });
+    navigate("/visualization");
+  }, [rec, startPlayback, navigate]);
 
   if (!rec) {
     return (
@@ -406,6 +424,15 @@ export default function RecordingDetailPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          {rec.status === "completed" && (
+            <button
+              onClick={handleAnalyzeInVisualizer}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/15 text-neural-accent-cyan border border-neural-accent-cyan/30 hover:bg-neural-accent-cyan/25 neural-transition"
+            >
+              <Eye className="w-4 h-4" />
+              Analyze in Visualizer
+            </button>
+          )}
           <button
             onClick={() => alert(`Downloading ${rec.name} (${rec.fileSize})...`)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition"
