@@ -1,5 +1,7 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/layout/AppLayout";
+import LoginPage from "@/components/auth/LoginPage";
 import DashboardPage from "@/components/dashboard/DashboardPage";
 import ExperimentListPage from "@/components/experiments/ExperimentListPage";
 import ExperimentDetailPage from "@/components/experiments/ExperimentDetailPage";
@@ -12,10 +14,29 @@ import AnalysisDetailPage from "@/components/analysis/AnalysisDetailPage";
 import NewAnalysisPage from "@/components/analysis/NewAnalysisPage";
 import SettingsPage from "@/components/settings/SettingsPage";
 
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <Routes>
-      <Route element={<AppLayout />}>
+      {/* Public route */}
+      <Route path="/login" element={<LoginGate />} />
+
+      {/* Protected routes */}
+      <Route
+        element={
+          <RequireAuth>
+            <AppLayout />
+          </RequireAuth>
+        }
+      >
         <Route path="/" element={<DashboardPage />} />
         <Route path="/experiments" element={<ExperimentListPage />} />
         <Route path="/experiments/:id" element={<ExperimentDetailPage />} />
@@ -30,4 +51,11 @@ export default function App() {
       </Route>
     </Routes>
   );
+}
+
+/** If already logged in, redirect to dashboard instead of showing login */
+function LoginGate() {
+  const { isAuthenticated } = useAuth();
+  if (isAuthenticated) return <Navigate to="/" replace />;
+  return <LoginPage />;
 }

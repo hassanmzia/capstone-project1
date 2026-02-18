@@ -1,14 +1,20 @@
+import { useState, useRef, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import type { RootState } from "@/store";
 import { togglePanel } from "@/store/slices/chatSlice";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Circle,
   Wifi,
   WifiOff,
   MessageSquare,
-  User,
   Clock,
   Zap,
+  LogOut,
+  Settings,
+  ChevronDown,
+  Shield,
 } from "lucide-react";
 import NotificationPanel from "@/components/notifications/NotificationPanel";
 
@@ -21,12 +27,41 @@ function formatDuration(seconds: number): string {
 
 export default function Header() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const { isRecording, status, duration, spikeCount } = useSelector(
     (state: RootState) => state.recording
   );
   const { isPanelOpen } = useSelector((state: RootState) => state.chat);
   const agents = useSelector((state: RootState) => state.agents.agents);
   const allOnline = agents.every((a) => a.status === "online");
+
+  const [profileOpen, setProfileOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    if (profileOpen) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [profileOpen]);
+
+  const handleLogout = () => {
+    setProfileOpen(false);
+    logout();
+    navigate("/login", { replace: true });
+  };
+
+  const roleColor: Record<string, string> = {
+    Admin: "text-neural-accent-red",
+    Researcher: "text-neural-accent-cyan",
+    Operator: "text-neural-accent-amber",
+    Viewer: "text-neural-text-muted",
+  };
 
   return (
     <header className="flex items-center justify-between h-14 px-4 bg-neural-surface border-b border-neural-border">
@@ -96,13 +131,55 @@ export default function Header() {
 
         <div className="w-px h-6 bg-neural-border" />
 
-        <button
-          onClick={() => alert("User profile settings — coming soon")}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-surface-alt neural-transition"
-        >
-          <User className="w-4 h-4" />
-          <span className="hidden lg:inline">Researcher</span>
-        </button>
+        {/* Profile dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setProfileOpen((o) => !o)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-surface-alt neural-transition"
+          >
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-neural-accent-cyan to-neural-accent-purple flex items-center justify-center">
+              <span className="text-xs font-bold text-white">
+                {user?.name?.charAt(0)?.toUpperCase() ?? "?"}
+              </span>
+            </div>
+            <span className="hidden lg:inline max-w-[120px] truncate">{user?.name ?? "User"}</span>
+            <ChevronDown className="w-3 h-3 hidden lg:block" />
+          </button>
+
+          {profileOpen && (
+            <div className="absolute right-0 top-full mt-1 w-64 bg-neural-surface border border-neural-border rounded-xl shadow-xl shadow-black/30 z-50 overflow-hidden">
+              {/* User info */}
+              <div className="px-4 py-3 border-b border-neural-border">
+                <p className="text-sm font-medium text-neural-text-primary">{user?.name}</p>
+                <p className="text-xs text-neural-text-muted">{user?.email}</p>
+                <div className="flex items-center gap-1 mt-1">
+                  <Shield className="w-3 h-3" />
+                  <span className={`text-xs font-medium ${roleColor[user?.role ?? "Viewer"]}`}>
+                    {user?.role}
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="py-1">
+                <button
+                  onClick={() => { setProfileOpen(false); navigate("/settings"); }}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-surface-alt neural-transition"
+                >
+                  <Settings className="w-4 h-4" />
+                  Settings
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-neural-accent-red hover:bg-neural-accent-red/10 neural-transition"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
