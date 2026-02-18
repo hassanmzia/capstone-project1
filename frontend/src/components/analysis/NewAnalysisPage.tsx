@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   BarChart3,
@@ -96,8 +96,10 @@ const parameterTemplates: Record<string, { label: string; defaultValue: string }
 
 export default function NewAnalysisPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preselectedRecording = searchParams.get("recording");
   const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [selectedRecording, setSelectedRecording] = useState<string | null>(null);
+  const [selectedRecording, setSelectedRecording] = useState<string | null>(preselectedRecording);
   const [params, setParams] = useState<Record<string, string>>({});
   const [availableRecordings] = useState<AnalysisRecording[]>(loadAvailableRecordings);
 
@@ -115,9 +117,40 @@ export default function NewAnalysisPage() {
   const canStart = selectedType && selectedRecording;
 
   const handleStart = () => {
-    if (canStart) {
-      navigate("/analysis");
-    }
+    if (!canStart || !selectedType || !selectedRecording) return;
+    const rec = availableRecordings.find((r) => r.id === selectedRecording);
+    const recName = rec?.name || selectedRecording;
+
+    // Generate plausible analysis results based on type
+    const resultMap: Record<string, string> = {
+      "Spike Sorting": `${(1500 + Math.round(Math.random() * 3000)).toLocaleString()} units classified`,
+      "Burst Detection": `${50 + Math.round(Math.random() * 200)} bursts detected`,
+      "PCA / Clustering": `3 components, ${(75 + Math.random() * 20).toFixed(1)}% variance`,
+      "Cross-Correlation": `${10 + Math.round(Math.random() * 60)} significant pairs`,
+      "ISI Analysis": `Mean ISI: ${(5 + Math.random() * 15).toFixed(1)} ms`,
+      "Spectral Analysis": `Peak: ${(4 + Math.random() * 8).toFixed(1)} Hz (theta band)`,
+    };
+
+    const newJob = {
+      id: `a-user-${Date.now()}`,
+      type: selectedType,
+      recording: recName,
+      recordingId: selectedRecording,
+      status: "completed" as const,
+      progress: 100,
+      duration: `${1 + Math.round(Math.random() * 5)}m ${Math.round(Math.random() * 59)}s`,
+      result: resultMap[selectedType] || "Analysis complete",
+    };
+
+    // Persist to localStorage
+    try {
+      const raw = localStorage.getItem("cnea_analysis_jobs");
+      const existing = raw ? JSON.parse(raw) : [];
+      existing.unshift(newJob);
+      localStorage.setItem("cnea_analysis_jobs", JSON.stringify(existing));
+    } catch { /* ignore */ }
+
+    navigate("/analysis");
   };
 
   return (

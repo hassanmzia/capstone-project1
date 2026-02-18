@@ -17,6 +17,7 @@ import {
   Cpu,
   Activity,
   BarChart3,
+  FlaskConical,
 } from "lucide-react";
 import LiveRecordingDashboard, { type RecordingStats, type EventMarker } from "./LiveRecordingDashboard";
 import { useRecordingSession } from "@/contexts/RecordingSessionContext";
@@ -656,13 +657,22 @@ export default function RecordingBrowserPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1">
                       {rec.status === "completed" && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleAnalyzeInVisualizer(rec); }}
-                          className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-cyan neural-transition"
-                          title="Analyze in Visualizer"
-                        >
-                          <BarChart3 className="w-3.5 h-3.5" />
-                        </button>
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleAnalyzeInVisualizer(rec); }}
+                            className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-cyan neural-transition"
+                            title="Analyze in Visualizer"
+                          >
+                            <BarChart3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigate(`/analysis/new?recording=${rec.id}`); }}
+                            className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-green neural-transition"
+                            title="Run Analysis"
+                          >
+                            <FlaskConical className="w-3.5 h-3.5" />
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={(e) => { e.stopPropagation(); navigate(`/recordings/${rec.id}`); }}
