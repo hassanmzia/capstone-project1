@@ -8,6 +8,9 @@ import {
   setGainMode,
   setStimulationConfig,
   setPixelConfig,
+  markSynced,
+  resetConfig,
+  setActivePreset,
 } from "@/store/slices/configSlice";
 import type { GainMode } from "@/types/neural";
 import {
@@ -74,6 +77,14 @@ export default function ControlsPage() {
   const dispatch = useDispatch();
   const config = useSelector((state: RootState) => state.config);
   const [activeTab, setActiveTab] = useState<TabId>("bias");
+  const [showPresetMenu, setShowPresetMenu] = useState(false);
+
+  const presets = [
+    { id: "default", name: "Default" },
+    { id: "high-density", name: "High Density" },
+    { id: "low-noise", name: "Low Noise" },
+    { id: "stimulation", name: "Stimulation" },
+  ];
 
   const biasEntries: [string, string, number, number, number, string][] = [
     ["vRefP", "V Ref Positive", 0, 3.3, 0.01, "V"],
@@ -126,15 +137,43 @@ export default function ControlsPage() {
           </div>
         )}
 
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition">
-          <Upload className="w-4 h-4" />
-          Load Preset
-        </button>
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition">
+        <div className="relative">
+          <button
+            onClick={() => setShowPresetMenu(!showPresetMenu)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition"
+          >
+            <Upload className="w-4 h-4" />
+            Load Preset
+          </button>
+          {showPresetMenu && (
+            <div className="absolute top-full right-0 mt-1 w-48 bg-neural-surface border border-neural-border rounded-lg shadow-xl z-50 py-1">
+              {presets.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    dispatch(setActivePreset(p.id));
+                    dispatch(resetConfig());
+                    setShowPresetMenu(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-neural-text-secondary hover:bg-neural-surface-alt hover:text-neural-text-primary neural-transition"
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => dispatch(resetConfig())}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition"
+        >
           <RotateCcw className="w-4 h-4" />
           Reset
         </button>
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition">
+        <button
+          onClick={() => dispatch(markSynced())}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition"
+        >
           <Save className="w-4 h-4" />
           Apply
         </button>

@@ -112,6 +112,16 @@ const configSlice = createSlice({
     setConfigError(state, action: PayloadAction<string | null>) {
       state.error = action.payload;
     },
+    resetConfig(state) {
+      state.bias = defaultBias;
+      state.clock = defaultClock;
+      state.tia = defaultTia;
+      state.gainMode = "high";
+      state.stimulation = defaultStimulation;
+      state.pixel = defaultPixel;
+      state.isDirty = false;
+      state.activePreset = null;
+    },
   },
 });
 
@@ -119,6 +129,7 @@ export const {
   setBiasParams, setClockConfig, setTiaConfig, setGainMode,
   setStimulationConfig, setPixelConfig, setFullConfig,
   setActivePreset, markSynced, setConfigLoading, setConfigError,
+  resetConfig,
 } = configSlice.actions;
 
 export default configSlice.reducer;

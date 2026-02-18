@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   Settings,
   HardDrive,
@@ -41,6 +41,33 @@ const mockUsers = [
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("presets");
+  const [presets, setPresets] = useState(mockPresets);
+  const [users, setUsers] = useState(mockUsers);
+  const [savedNotice, setSavedNotice] = useState(false);
+
+  const handleNewPreset = useCallback(() => {
+    const id = `p-${presets.length + 1}`;
+    setPresets((prev) => [
+      ...prev,
+      { id, name: `Custom Preset ${prev.length + 1}`, description: "New custom configuration", isDefault: false, createdBy: "Researcher" },
+    ]);
+  }, [presets.length]);
+
+  const handleDeletePreset = useCallback((id: string) => {
+    setPresets((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
+  const handleAddUser = useCallback(() => {
+    setUsers((prev) => [
+      ...prev,
+      { name: `New User ${prev.length + 1}`, role: "Researcher", email: `user${prev.length + 1}@lab.edu`, lastActive: "just now" },
+    ]);
+  }, []);
+
+  const handleSaveSettings = useCallback(() => {
+    setSavedNotice(true);
+    setTimeout(() => setSavedNotice(false), 2000);
+  }, []);
 
   return (
     <div className="flex flex-col gap-4 h-full">
@@ -83,14 +110,17 @@ export default function SettingsPage() {
                     Manage saved hardware configurations for quick loading.
                   </p>
                 </div>
-                <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition">
+                <button
+                  onClick={handleNewPreset}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition"
+                >
                   <Plus className="w-4 h-4" />
                   New Preset
                 </button>
               </div>
 
               <div className="space-y-3">
-                {mockPresets.map((preset) => (
+                {presets.map((preset) => (
                   <div
                     key={preset.id}
                     className="flex items-center justify-between p-4 rounded-lg bg-neural-surface-alt border border-neural-border"
@@ -108,10 +138,19 @@ export default function SettingsPage() {
                       <p className="text-xs text-neural-text-muted mt-0.5">Created by: {preset.createdBy}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button className="p-2 rounded-lg hover:bg-neural-border text-neural-text-muted hover:text-neural-text-primary neural-transition">
+                      <button
+                        onClick={() => {
+                          const newName = prompt("Preset name:", preset.name);
+                          if (newName) setPresets((prev) => prev.map((p) => p.id === preset.id ? { ...p, name: newName } : p));
+                        }}
+                        className="p-2 rounded-lg hover:bg-neural-border text-neural-text-muted hover:text-neural-text-primary neural-transition"
+                      >
                         <Edit3 className="w-4 h-4" />
                       </button>
-                      <button className="p-2 rounded-lg hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-red neural-transition">
+                      <button
+                        onClick={() => handleDeletePreset(preset.id)}
+                        className="p-2 rounded-lg hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-red neural-transition"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -131,14 +170,17 @@ export default function SettingsPage() {
                     Manage user accounts and access permissions.
                   </p>
                 </div>
-                <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition">
+                <button
+                  onClick={handleAddUser}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition"
+                >
                   <Plus className="w-4 h-4" />
                   Add User
                 </button>
               </div>
 
               <div className="space-y-2">
-                {mockUsers.map((user) => (
+                {users.map((user) => (
                   <div
                     key={user.email}
                     className="flex items-center justify-between p-3 rounded-lg bg-neural-surface-alt border border-neural-border"
@@ -188,7 +230,7 @@ export default function SettingsPage() {
                           {agent.replace("-", " ")}
                         </span>
                       </div>
-                      <button className="text-xs text-neural-accent-cyan hover:underline">Configure</button>
+                      <button onClick={() => alert(`Configure ${agent.replace("-", " ")} — coming soon`)} className="text-xs text-neural-accent-cyan hover:underline">Configure</button>
                     </div>
                     <div className="grid grid-cols-3 gap-4 text-xs">
                       <div>
@@ -270,9 +312,12 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <button className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition">
+                <button
+                  onClick={handleSaveSettings}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition"
+                >
                   <Save className="w-4 h-4" />
-                  Save Settings
+                  {savedNotice ? "Saved!" : "Save Settings"}
                 </button>
               </div>
             </div>

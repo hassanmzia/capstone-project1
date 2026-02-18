@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   HardDrive,
   Search,
@@ -10,6 +10,7 @@ import {
   FileText,
   Filter,
   SortDesc,
+  SortAsc,
 } from "lucide-react";
 
 interface MockRecording {
@@ -36,12 +37,28 @@ const mockRecordings: MockRecording[] = [
 
 export default function RecordingBrowserPage() {
   const [search, setSearch] = useState("");
+  const [recordings, setRecordings] = useState(mockRecordings);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [sortAsc, setSortAsc] = useState(false);
 
-  const filtered = mockRecordings.filter(
+  const handleDelete = useCallback((id: string) => {
+    setRecordings((prev) => prev.filter((r) => r.id !== id));
+  }, []);
+
+  const handleSort = useCallback(() => {
+    setSortAsc((prev) => !prev);
+    setRecordings((prev) => [...prev].sort((a, b) =>
+      sortAsc ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date)
+    ));
+  }, [sortAsc]);
+
+  const filtered = recordings.filter(
     (r) =>
-      search === "" ||
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
-      r.experimentName.toLowerCase().includes(search.toLowerCase())
+      (search === "" ||
+        r.name.toLowerCase().includes(search.toLowerCase()) ||
+        r.experimentName.toLowerCase().includes(search.toLowerCase())) &&
+      (statusFilter === "all" || r.status === statusFilter)
   );
 
   return (
@@ -65,12 +82,39 @@ export default function RecordingBrowserPage() {
               className="pl-9 pr-4 py-1.5 bg-neural-surface-alt border border-neural-border rounded-lg text-sm text-neural-text-primary placeholder:text-neural-text-muted focus:outline-none focus:border-neural-accent-cyan/50 w-64"
             />
           </div>
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition">
-            <Filter className="w-4 h-4" />
-            Filter
-          </button>
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition">
-            <SortDesc className="w-4 h-4" />
+          <div className="relative">
+            <button
+              onClick={() => setShowFilterMenu(!showFilterMenu)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border neural-transition ${
+                statusFilter !== "all"
+                  ? "bg-neural-accent-cyan/10 text-neural-accent-cyan border-neural-accent-cyan/30"
+                  : "bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border-neural-border"
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              {statusFilter === "all" ? "Filter" : statusFilter}
+            </button>
+            {showFilterMenu && (
+              <div className="absolute top-full right-0 mt-1 w-40 bg-neural-surface border border-neural-border rounded-lg shadow-xl z-50 py-1">
+                {["all", "completed", "processing", "error"].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => { setStatusFilter(s); setShowFilterMenu(false); }}
+                    className={`w-full text-left px-3 py-2 text-sm capitalize neural-transition ${
+                      statusFilter === s ? "text-neural-accent-cyan bg-neural-accent-cyan/10" : "text-neural-text-secondary hover:bg-neural-surface-alt"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handleSort}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition"
+          >
+            {sortAsc ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
             Sort
           </button>
         </div>
@@ -152,13 +196,25 @@ export default function RecordingBrowserPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1">
-                      <button className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-green neural-transition" title="Open">
+                      <button
+                        onClick={() => alert(`Opening ${rec.name}...`)}
+                        className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-green neural-transition"
+                        title="Open"
+                      >
                         <Play className="w-3.5 h-3.5" />
                       </button>
-                      <button className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-blue neural-transition" title="Download">
+                      <button
+                        onClick={() => alert(`Downloading ${rec.name} (${rec.fileSize})...`)}
+                        className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-blue neural-transition"
+                        title="Download"
+                      >
                         <Download className="w-3.5 h-3.5" />
                       </button>
-                      <button className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-red neural-transition" title="Delete">
+                      <button
+                        onClick={() => handleDelete(rec.id)}
+                        className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-red neural-transition"
+                        title="Delete"
+                      >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>

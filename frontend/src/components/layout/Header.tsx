@@ -96,7 +96,10 @@ export default function Header() {
 
         <div className="w-px h-6 bg-neural-border" />
 
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-surface-alt neural-transition">
+        <button
+          onClick={() => alert("User profile settings — coming soon")}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-surface-alt neural-transition"
+        >
           <User className="w-4 h-4" />
           <span className="hidden lg:inline">Researcher</span>
         </button>
