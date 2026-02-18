@@ -129,6 +129,69 @@ export function useSpikeEvents(config: UseSpikeEventsConfig = {}): UseSpikeEvent
     setIsConnected(wsConnected);
   }, [wsConnected]);
 
+  // ---------- Mock spike generation when no backend ----------
+  const mockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mockStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (wsConnected) {
+      if (mockTimerRef.current) {
+        clearInterval(mockTimerRef.current);
+        mockTimerRef.current = null;
+      }
+      if (mockStartTimerRef.current) {
+        clearTimeout(mockStartTimerRef.current);
+        mockStartTimerRef.current = null;
+      }
+      return;
+    }
+
+    mockStartTimerRef.current = setTimeout(() => {
+      if (mockTimerRef.current) return;
+
+      setIsConnected(true); // Indicate demo mode active
+
+      // Generate spikes at ~200/sec across ~150 active sites
+      mockTimerRef.current = setInterval(() => {
+        const spikesThisTick = 15 + Math.floor(Math.random() * 10); // 15-24 per 100ms
+        for (let i = 0; i < spikesThisTick; i++) {
+          // Cluster spikes around a few "hot" regions
+          const cluster = Math.floor(Math.random() * 6);
+          const clusterCenter = [512, 1024, 1800, 2400, 3000, 3600][cluster];
+          const offset = Math.floor((Math.random() - 0.5) * 200);
+          const siteIndex = Math.max(0, Math.min(totalSites - 1, clusterCenter + offset));
+
+          spikeCountsRef.current[siteIndex] += 1;
+          recentCountsRef.current[siteIndex] += 1;
+          totalSpikesRef.current += 1;
+
+          if (i < 3) { // Only store a few per tick in the latest list
+            latestSpikesRef.current.push({
+              siteIndex,
+              channelId: siteIndex % 64,
+              timestamp: Date.now(),
+              amplitude: 100 + Math.random() * 150,
+            });
+            if (latestSpikesRef.current.length > 100) {
+              latestSpikesRef.current = latestSpikesRef.current.slice(-100);
+            }
+          }
+        }
+      }, 100);
+    }, 3000);
+
+    return () => {
+      if (mockTimerRef.current) {
+        clearInterval(mockTimerRef.current);
+        mockTimerRef.current = null;
+      }
+      if (mockStartTimerRef.current) {
+        clearTimeout(mockStartTimerRef.current);
+        mockStartTimerRef.current = null;
+      }
+    };
+  }, [wsConnected, totalSites]);
+
   // Periodic update: decay rates and push state
   useEffect(() => {
     const interval = setInterval(() => {
