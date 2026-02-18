@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   HardDrive,
   Search,
@@ -11,6 +12,7 @@ import {
   Filter,
   SortDesc,
   SortAsc,
+  Circle,
 } from "lucide-react";
 
 interface MockRecording {
@@ -36,8 +38,10 @@ const mockRecordings: MockRecording[] = [
 ];
 
 export default function RecordingBrowserPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [recordings, setRecordings] = useState(mockRecordings);
+  const [isRecording, setIsRecording] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [sortAsc, setSortAsc] = useState(false);
@@ -117,6 +121,39 @@ export default function RecordingBrowserPage() {
             {sortAsc ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
             Sort
           </button>
+          <button
+            onClick={() => {
+              if (isRecording) {
+                const id = `rec-${String(43 + recordings.length).padStart(3, "0")}`;
+                setRecordings((prev) => [
+                  {
+                    id,
+                    name: `session_${String(43 + prev.length).padStart(3, "0")}`,
+                    experimentName: "New Recording",
+                    date: new Date().toISOString().slice(0, 16).replace("T", " "),
+                    duration: "00:00",
+                    spikeCount: 0,
+                    channels: 64,
+                    fileSize: "0 MB",
+                    format: "HDF5",
+                    status: "processing" as const,
+                  },
+                  ...prev,
+                ]);
+                setIsRecording(false);
+              } else {
+                setIsRecording(true);
+              }
+            }}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border neural-transition ${
+              isRecording
+                ? "bg-neural-accent-red/20 text-neural-accent-red border-neural-accent-red/30 hover:bg-neural-accent-red/30"
+                : "bg-neural-accent-green/20 text-neural-accent-green border-neural-accent-green/30 hover:bg-neural-accent-green/30"
+            }`}
+          >
+            <Circle className={`w-3 h-3 ${isRecording ? "fill-neural-accent-red" : ""}`} />
+            {isRecording ? "Stop Recording" : "Start Recording"}
+          </button>
         </div>
       </div>
 
@@ -142,6 +179,7 @@ export default function RecordingBrowserPage() {
               {filtered.map((rec) => (
                 <tr
                   key={rec.id}
+                  onClick={() => navigate(`/recordings/${rec.id}`)}
                   className="border-b border-neural-border/50 hover:bg-neural-surface-alt neural-transition cursor-pointer"
                 >
                   <td className="px-4 py-3">
@@ -197,21 +235,21 @@ export default function RecordingBrowserPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1">
                       <button
-                        onClick={() => alert(`Opening ${rec.name}...`)}
+                        onClick={(e) => { e.stopPropagation(); navigate(`/recordings/${rec.id}`); }}
                         className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-green neural-transition"
                         title="Open"
                       >
                         <Play className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => alert(`Downloading ${rec.name} (${rec.fileSize})...`)}
+                        onClick={(e) => { e.stopPropagation(); alert(`Downloading ${rec.name} (${rec.fileSize})...`); }}
                         className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-blue neural-transition"
                         title="Download"
                       >
                         <Download className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDelete(rec.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(rec.id); }}
                         className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-red neural-transition"
                         title="Delete"
                       >
