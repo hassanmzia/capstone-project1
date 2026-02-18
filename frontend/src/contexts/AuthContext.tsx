@@ -11,11 +11,21 @@ export interface AuthUser {
   status: "active" | "inactive" | "locked";
 }
 
+interface RegisterResult {
+  ok: boolean;
+  error?: string;
+  pendingVerification?: boolean;
+  /** Displayed in the UI so the user can "check their email" (demo only) */
+  verificationCode?: string;
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => { ok: boolean; error?: string };
-  register: (name: string, email: string, password: string, inviteCode?: string) => { ok: boolean; error?: string };
+  register: (name: string, email: string, password: string, inviteCode?: string) => RegisterResult;
+  verifyEmail: (email: string, code: string) => { ok: boolean; error?: string };
+  resendVerification: (email: string) => { ok: boolean; error?: string; verificationCode?: string };
   logout: () => void;
   updateProfile: (updates: Partial<Pick<AuthUser, "name" | "email">>) => void;
 }
@@ -29,11 +39,18 @@ interface StoredAccount {
   email: string;
   password: string;
   role: RoleName;
-  status: "active" | "inactive" | "locked";
+  status: "active" | "inactive" | "locked" | "pending";
+}
+
+interface PendingVerification {
+  email: string;
+  code: string;
+  expiresAt: number;
 }
 
 const ACCOUNTS_KEY = "cnea_accounts";
 const SESSION_KEY = "cnea_session";
+const VERIFICATION_KEY = "cnea_pending_verifications";
 
 function loadAccounts(): StoredAccount[] {
   try {
@@ -74,21 +91,66 @@ function saveSession(user: AuthUser | null) {
   }
 }
 
+/* ── Verification helpers ── */
+function generateCode(): string {
+  return String(Math.floor(100000 + Math.random() * 900000)); // 6-digit
+}
+
+function loadVerifications(): PendingVerification[] {
+  try {
+    const raw = localStorage.getItem(VERIFICATION_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function saveVerifications(verifications: PendingVerification[]) {
+  localStorage.setItem(VERIFICATION_KEY, JSON.stringify(verifications));
+}
+
+function upsertVerification(email: string): string {
+  const code = generateCode();
+  const verifications = loadVerifications().filter(
+    (v) => v.email.toLowerCase() !== email.toLowerCase(),
+  );
+  verifications.push({
+    email: email.toLowerCase(),
+    code,
+    expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+  });
+  saveVerifications(verifications);
+  return code;
+}
+
+function checkVerification(email: string, code: string): { ok: boolean; error?: string } {
+  const verifications = loadVerifications();
+  const entry = verifications.find((v) => v.email.toLowerCase() === email.toLowerCase());
+  if (!entry) return { ok: false, error: "No verification pending for this email" };
+  if (Date.now() > entry.expiresAt) return { ok: false, error: "Verification code has expired. Please resend." };
+  if (entry.code !== code) return { ok: false, error: "Incorrect verification code" };
+  // Remove used verification
+  saveVerifications(verifications.filter((v) => v.email.toLowerCase() !== email.toLowerCase()));
+  return { ok: true };
+}
+
 /* ── Provider ── */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(loadSession);
 
   // Sync user list in cnea_users (Settings page reads this)
   const syncUsersToSettings = useCallback((accounts: StoredAccount[]) => {
-    const settingsUsers = accounts.map((a) => ({
-      id: a.id,
-      name: a.name,
-      role: a.role,
-      email: a.email,
-      lastActive: "—",
-      status: a.status,
-      permissions: [] as string[], // Settings page will apply role defaults
-    }));
+    // Only sync active accounts to Settings page (not pending)
+    const settingsUsers = accounts
+      .filter((a) => a.status !== "pending")
+      .map((a) => ({
+        id: a.id,
+        name: a.name,
+        role: a.role,
+        email: a.email,
+        lastActive: "—",
+        status: a.status as "active" | "inactive" | "locked",
+        permissions: [] as string[],
+      }));
     localStorage.setItem("cnea_users", JSON.stringify(settingsUsers));
   }, []);
 
@@ -96,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const accounts = loadAccounts();
     const account = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
     if (!account) return { ok: false, error: "No account found with that email" };
+    if (account.status === "pending") return { ok: false, error: "Email not verified. Please check your email for the verification code." };
     if (account.status === "locked") return { ok: false, error: "Account is locked. Contact an administrator." };
     if (account.status === "inactive") return { ok: false, error: "Account is inactive. Contact an administrator." };
     if (account.password !== password) return { ok: false, error: "Incorrect password" };
@@ -112,9 +175,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, []);
 
-  const register = useCallback((name: string, email: string, password: string, inviteCode?: string): { ok: boolean; error?: string } => {
+  const register = useCallback((name: string, email: string, password: string, inviteCode?: string): RegisterResult => {
     const accounts = loadAccounts();
-    if (accounts.some((a) => a.email.toLowerCase() === email.toLowerCase())) {
+    const existing = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
+    if (existing) {
+      if (existing.status === "pending") {
+        return { ok: false, error: "An account with that email is pending verification. Please check your email or resend the code." };
+      }
       return { ok: false, error: "An account with that email already exists" };
     }
 
@@ -129,29 +196,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
+    // Create account in pending state
     const newAccount: StoredAccount = {
       id: `u-${Date.now()}`,
       name,
       email,
       password,
       role,
-      status: "active",
+      status: "pending",
     };
     const updated = [...accounts, newAccount];
     saveAccounts(updated);
-    syncUsersToSettings(updated);
 
+    // Generate verification code
+    const code = upsertVerification(email);
+
+    return { ok: true, pendingVerification: true, verificationCode: code };
+  }, []);
+
+  const verifyEmail = useCallback((email: string, code: string): { ok: boolean; error?: string } => {
+    const result = checkVerification(email, code);
+    if (!result.ok) return result;
+
+    // Activate account
+    const accounts = loadAccounts();
+    const idx = accounts.findIndex((a) => a.email.toLowerCase() === email.toLowerCase());
+    if (idx < 0) return { ok: false, error: "Account not found" };
+
+    accounts[idx].status = "active";
+    saveAccounts(accounts);
+    syncUsersToSettings(accounts);
+
+    // Auto-login after verification
+    const account = accounts[idx];
     const authUser: AuthUser = {
-      id: newAccount.id,
-      name: newAccount.name,
-      email: newAccount.email,
-      role: newAccount.role,
-      status: newAccount.status,
+      id: account.id,
+      name: account.name,
+      email: account.email,
+      role: account.role,
+      status: "active",
     };
     saveSession(authUser);
     setUser(authUser);
     return { ok: true };
   }, [syncUsersToSettings]);
+
+  const resendVerification = useCallback((email: string): { ok: boolean; error?: string; verificationCode?: string } => {
+    const accounts = loadAccounts();
+    const account = accounts.find((a) => a.email.toLowerCase() === email.toLowerCase());
+    if (!account) return { ok: false, error: "No account found with that email" };
+    if (account.status !== "pending") return { ok: false, error: "Account is already verified" };
+    const code = upsertVerification(email);
+    return { ok: true, verificationCode: code };
+  }, []);
 
   const logout = useCallback(() => {
     saveSession(null);
@@ -163,7 +260,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!prev) return prev;
       const updated = { ...prev, ...updates };
       saveSession(updated);
-      // Also update accounts store
       const accounts = loadAccounts();
       const idx = accounts.findIndex((a) => a.id === updated.id);
       if (idx >= 0) {
@@ -179,7 +275,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => { loadAccounts(); }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, verifyEmail, resendVerification, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );
