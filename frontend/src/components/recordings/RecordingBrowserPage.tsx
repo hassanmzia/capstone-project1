@@ -17,6 +17,7 @@ import {
   Cpu,
   Activity,
 } from "lucide-react";
+import LiveRecordingDashboard, { type RecordingStats, type EventMarker } from "./LiveRecordingDashboard";
 
 export interface MockRecording {
   id: string;
@@ -30,6 +31,7 @@ export interface MockRecording {
   format: string;
   status: "completed" | "error" | "processing";
   sampleRate?: string;
+  markers?: EventMarker[];
 }
 
 const seedRecordings: MockRecording[] = [
@@ -59,13 +61,14 @@ function saveRecordings(recs: MockRecording[]) {
 
 /** Active recording session persisted across navigation */
 interface ActiveSession {
-  phase: "setup" | "recording";
+  phase: "setup" | "recording" | "paused";
   name: string;
   experiment: string;
   channels: string;
   format: string;
   sampleRate: string;
-  startedAt: number; // timestamp when recording began (0 if still in setup)
+  startedAt: number;
+  pausedElapsed: number; // accumulated seconds before current pause
 }
 
 function loadActiveSession(): ActiveSession | null {
@@ -91,7 +94,7 @@ const availableExperiments = [
   { id: "exp-004", name: "Drug Screening - Compound 47B" },
 ];
 
-type RecordingPhase = "idle" | "setup" | "recording";
+type RecordingPhase = "idle" | "setup" | "recording" | "paused";
 
 export default function RecordingBrowserPage() {
   const navigate = useNavigate();
@@ -114,9 +117,13 @@ export default function RecordingBrowserPage() {
 
   // Recording timer — uses startedAt timestamp so elapsed time is always correct
   const startTimeRef = useRef<number>(restored.current?.startedAt ?? 0);
+  const pausedElapsedRef = useRef<number>(restored.current?.pausedElapsed ?? 0);
   const [elapsedSec, setElapsedSec] = useState(() => {
-    if (restored.current?.phase === "recording" && restored.current.startedAt > 0) {
-      return Math.floor((Date.now() - restored.current.startedAt) / 1000);
+    const s = restored.current;
+    if (!s) return 0;
+    if (s.phase === "paused") return s.pausedElapsed;
+    if (s.phase === "recording" && s.startedAt > 0) {
+      return s.pausedElapsed + Math.floor((Date.now() - s.startedAt) / 1000);
     }
     return 0;
   });
@@ -129,7 +136,7 @@ export default function RecordingBrowserPage() {
     return () => { mountedRef.current = false; };
   }, []);
 
-  // Persist recordings whenever they change (debounced to avoid tight loops)
+  // Persist recordings whenever they change (debounced)
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -141,7 +148,7 @@ export default function RecordingBrowserPage() {
     };
   }, [recordings]);
 
-  // Process "processing" → "completed" once on mount (not on every recordings change)
+  // Process "processing" → "completed" once on mount
   const hasProcessedRef = useRef(false);
   useEffect(() => {
     if (hasProcessedRef.current) return;
@@ -149,7 +156,6 @@ export default function RecordingBrowserPage() {
       (r) => r.status === "processing" && !r.id.startsWith("rec-0"),
     );
     if (!hasNewProcessing) return;
-
     hasProcessedRef.current = true;
     const timeout = setTimeout(() => {
       if (!mountedRef.current) return;
@@ -163,18 +169,23 @@ export default function RecordingBrowserPage() {
         }),
       );
     }, 5000);
-
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Restore timer if we're resuming a recording from navigation
+  // Timer lifecycle — starts/stops based on phase
   useEffect(() => {
     if (phase === "recording" && startTimeRef.current > 0 && !timerRef.current) {
       timerRef.current = setInterval(() => {
         if (!mountedRef.current) return;
-        setElapsedSec(Math.floor((Date.now() - startTimeRef.current) / 1000));
+        const running = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        setElapsedSec(pausedElapsedRef.current + running);
       }, 1000);
+    }
+
+    if (phase !== "recording" && timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
     }
 
     return () => {
@@ -187,6 +198,8 @@ export default function RecordingBrowserPage() {
 
   const nextSessionNum = 43 + recordings.filter((r) => !seedRecordings.some((s) => s.id === r.id)).length;
   const defaultName = `session_${String(nextSessionNum).padStart(3, "0")}`;
+
+  /* ── Phase transitions ── */
 
   const handleStartSetup = () => {
     const name = defaultName;
@@ -204,6 +217,7 @@ export default function RecordingBrowserPage() {
       format: "HDF5",
       sampleRate: "30000",
       startedAt: 0,
+      pausedElapsed: 0,
     });
   };
 
@@ -211,10 +225,7 @@ export default function RecordingBrowserPage() {
     const now = Date.now();
     setElapsedSec(0);
     startTimeRef.current = now;
-    timerRef.current = setInterval(() => {
-      if (!mountedRef.current) return;
-      setElapsedSec(Math.floor((Date.now() - now) / 1000));
-    }, 1000);
+    pausedElapsedRef.current = 0;
     setPhase("recording");
     saveActiveSession({
       phase: "recording",
@@ -224,23 +235,62 @@ export default function RecordingBrowserPage() {
       format: setupFormat,
       sampleRate: setupSampleRate,
       startedAt: now,
+      pausedElapsed: 0,
     });
   };
 
-  const handleStopRecording = () => {
+  const handlePause = useCallback(() => {
+    // Accumulate elapsed time and stop the wall-clock timer
+    const running = Math.floor((Date.now() - startTimeRef.current) / 1000);
+    const total = pausedElapsedRef.current + running;
+    pausedElapsedRef.current = total;
+    setElapsedSec(total);
+    setPhase("paused");
+    saveActiveSession({
+      phase: "paused",
+      name: setupName,
+      experiment: setupExperiment,
+      channels: setupChannels,
+      format: setupFormat,
+      sampleRate: setupSampleRate,
+      startedAt: 0,
+      pausedElapsed: total,
+    });
+  }, [setupName, setupExperiment, setupChannels, setupFormat, setupSampleRate]);
+
+  const handleResume = useCallback(() => {
+    const now = Date.now();
+    startTimeRef.current = now;
+    setPhase("recording");
+    saveActiveSession({
+      phase: "recording",
+      name: setupName,
+      experiment: setupExperiment,
+      channels: setupChannels,
+      format: setupFormat,
+      sampleRate: setupSampleRate,
+      startedAt: now,
+      pausedElapsed: pausedElapsedRef.current,
+    });
+  }, [setupName, setupExperiment, setupChannels, setupFormat, setupSampleRate]);
+
+  const handleStopRecording = useCallback((stats: RecordingStats, markers: EventMarker[]) => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
     const exp = availableExperiments.find((e) => e.id === setupExperiment);
-    const mins = Math.floor(elapsedSec / 60);
-    const secs = elapsedSec % 60;
+    const total = elapsedSec;
+    const mins = Math.floor(total / 60);
+    const secs = total % 60;
     const duration = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
     const channels = parseInt(setupChannels) || 64;
-    const sizeEstMB = Math.round(channels * (parseInt(setupSampleRate) || 30000) * 2 * elapsedSec / 1e6);
+
+    // Use real data size from stats
+    const sizeMB = Math.round(stats.dataMB);
 
     const id = `rec-new-${Date.now()}`;
-    hasProcessedRef.current = false; // allow processing effect to run for this new recording
+    hasProcessedRef.current = false;
     setRecordings((prev) => [
       {
         id,
@@ -248,18 +298,20 @@ export default function RecordingBrowserPage() {
         experimentName: exp?.name || "Unknown Experiment",
         date: new Date().toISOString().slice(0, 16).replace("T", " "),
         duration,
-        spikeCount: 0,
+        spikeCount: stats.spikeCount,
         channels,
-        fileSize: sizeEstMB >= 1000 ? `${(sizeEstMB / 1000).toFixed(1)} GB` : `${sizeEstMB} MB`,
+        fileSize: sizeMB >= 1024 ? `${(sizeMB / 1024).toFixed(1)} GB` : `${sizeMB} MB`,
         format: setupFormat,
         status: "processing" as const,
         sampleRate: setupSampleRate,
+        markers: markers.length > 0 ? markers : undefined,
       },
       ...prev,
     ]);
     setPhase("idle");
+    pausedElapsedRef.current = 0;
     saveActiveSession(null);
-  };
+  }, [setupExperiment, setupChannels, setupFormat, setupSampleRate, setupName, defaultName, elapsedSec]);
 
   const handleCancelSetup = () => {
     if (timerRef.current) {
@@ -267,13 +319,8 @@ export default function RecordingBrowserPage() {
       timerRef.current = null;
     }
     setPhase("idle");
+    pausedElapsedRef.current = 0;
     saveActiveSession(null);
-  };
-
-  const formatTimer = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
   const handleDelete = useCallback((id: string) => {
@@ -295,6 +342,28 @@ export default function RecordingBrowserPage() {
       (statusFilter === "all" || r.status === statusFilter)
   );
 
+  const isRecording = phase === "recording" || phase === "paused";
+
+  /* ═══════ RECORDING DASHBOARD (full-screen takeover) ═══════ */
+  if (isRecording) {
+    const exp = availableExperiments.find((e) => e.id === setupExperiment);
+    return (
+      <LiveRecordingDashboard
+        sessionName={setupName || defaultName}
+        experimentName={exp?.name || "Unknown Experiment"}
+        channels={parseInt(setupChannels) || 64}
+        sampleRate={parseInt(setupSampleRate) || 30000}
+        format={setupFormat}
+        elapsedSec={elapsedSec}
+        paused={phase === "paused"}
+        onPause={handlePause}
+        onResume={handleResume}
+        onStop={handleStopRecording}
+      />
+    );
+  }
+
+  /* ═══════ RECORDING BROWSER (idle / setup) ═══════ */
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Toolbar */}
@@ -351,23 +420,13 @@ export default function RecordingBrowserPage() {
             {sortAsc ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
             Sort
           </button>
-          {phase === "recording" ? (
-            <button
-              onClick={handleStopRecording}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border neural-transition bg-neural-accent-red/20 text-neural-accent-red border-neural-accent-red/30 hover:bg-neural-accent-red/30"
-            >
-              <Circle className="w-3 h-3 fill-neural-accent-red animate-pulse" />
-              Stop Recording ({formatTimer(elapsedSec)})
-            </button>
-          ) : (
-            <button
-              onClick={handleStartSetup}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border neural-transition bg-neural-accent-green/20 text-neural-accent-green border-neural-accent-green/30 hover:bg-neural-accent-green/30"
-            >
-              <Circle className="w-3 h-3" />
-              Start Recording
-            </button>
-          )}
+          <button
+            onClick={handleStartSetup}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border neural-transition bg-neural-accent-green/20 text-neural-accent-green border-neural-accent-green/30 hover:bg-neural-accent-green/30"
+          >
+            <Circle className="w-3 h-3" />
+            Start Recording
+          </button>
         </div>
       </div>
 
@@ -463,30 +522,6 @@ export default function RecordingBrowserPage() {
             >
               <Circle className="w-3 h-3" />
               Begin Recording
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Active Recording Banner */}
-      {phase === "recording" && (
-        <div className="bg-neural-surface rounded-xl border border-neural-accent-red/30 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Circle className="w-3 h-3 fill-neural-accent-red animate-pulse" />
-                <span className="text-sm font-semibold text-neural-accent-red">Recording</span>
-              </div>
-              <span className="text-lg font-mono text-neural-text-primary">{formatTimer(elapsedSec)}</span>
-              <span className="text-xs text-neural-text-muted">
-                {setupName || defaultName} &middot; {setupChannels} ch &middot; {setupFormat}
-              </span>
-            </div>
-            <button
-              onClick={handleStopRecording}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-neural-accent-red/20 text-neural-accent-red border border-neural-accent-red/30 hover:bg-neural-accent-red/30 neural-transition"
-            >
-              Stop & Save
             </button>
           </div>
         </div>

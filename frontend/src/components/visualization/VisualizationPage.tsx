@@ -78,7 +78,7 @@ export default function VisualizationPage() {
   const [showLeftPanel, setShowLeftPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [showBottomPanel, setShowBottomPanel] = useState(true);
-  const [showTelemetry, setShowTelemetry] = useState(false);
+  const [showTelemetry, setShowTelemetry] = useState(true);
 
   // Channel selection from electrode array
   const handleElectrodeSelect = useCallback(
