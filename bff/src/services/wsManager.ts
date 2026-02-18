@@ -15,6 +15,8 @@ class WsManager {
       ['neural-data', new Set()],
       ['agent-status', new Set()],
       ['chat', new Set()],
+      ['spike-events', new Set()],
+      ['notifications', new Set()],
     ]);
   }
 
@@ -134,6 +136,8 @@ class WsManager {
       'neural-data': this.getClientCount('neural-data'),
       'agent-status': this.getClientCount('agent-status'),
       chat: this.getClientCount('chat'),
+      'spike-events': this.getClientCount('spike-events'),
+      notifications: this.getClientCount('notifications'),
       total: this.getTotalClientCount(),
     };
   }
