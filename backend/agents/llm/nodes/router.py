@@ -83,7 +83,7 @@ async def route_intent(state: Dict[str, Any]) -> str:
 
     # Call the LLM to classify the intent
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
             resp = await client.post(
                 f"{OLLAMA_BASE_URL}/api/chat",
                 json={

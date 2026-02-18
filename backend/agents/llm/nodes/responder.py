@@ -6,15 +6,11 @@ conversation history, then calls the LLM to generate the final response.
 """
 
 import logging
-import os
 from typing import Any, Dict, List
 
-import httpx
+from ..providers import chat as provider_chat
 
 logger = logging.getLogger(__name__)
-
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:12434")
-OLLAMA_CHAT_MODEL = os.getenv("OLLAMA_CHAT_MODEL", "deepseek-r1:7b")
 
 BASE_SYSTEM_PROMPT = """You are the Neural Interface Research Assistant, an AI assistant for neuroscience researchers using the CNEAv5 neural interfacing platform.
 
@@ -137,8 +133,11 @@ async def generate_response(state: Dict[str, Any]) -> Dict[str, Any]:
         if role in ("user", "assistant"):
             llm_messages.append({"role": role, "content": content})
 
-    # Call the LLM
-    assistant_response = await _call_ollama(llm_messages)
+    # Call the LLM via the provider abstraction.
+    # The model_id is read from state so the user's selection is respected
+    # even in the non-streaming LangGraph path.
+    model_id = state.get("system_context", {}).get("model_id")
+    assistant_response = await provider_chat(llm_messages, model_id=model_id)
 
     # Append the response to messages
     messages.append({"role": "assistant", "content": assistant_response})
@@ -151,33 +150,3 @@ async def generate_response(state: Dict[str, Any]) -> Dict[str, Any]:
         "tool_results": [],
         "requires_confirmation": False,
     }
-
-
-async def _call_ollama(messages: List[Dict[str, str]]) -> str:
-    """Call the Ollama chat API."""
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
-            resp = await client.post(
-                f"{OLLAMA_BASE_URL}/api/chat",
-                json={
-                    "model": OLLAMA_CHAT_MODEL,
-                    "messages": messages,
-                    "stream": False,
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data.get("message", {}).get("content", "")
-    except httpx.ConnectError:
-        logger.error("Cannot connect to Ollama at %s", OLLAMA_BASE_URL)
-        return (
-            "I apologize, but I cannot generate a response right now because "
-            "the language model service is unavailable. Please ensure Ollama "
-            "is running and try again."
-        )
-    except httpx.HTTPStatusError as exc:
-        logger.error("Ollama HTTP error: %s", exc)
-        return f"An error occurred while generating the response (HTTP {exc.response.status_code})."
-    except Exception as exc:
-        logger.error("Unexpected LLM error: %s", exc)
-        return f"An unexpected error occurred: {exc}"
