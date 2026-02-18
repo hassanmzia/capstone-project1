@@ -353,8 +353,14 @@ export default function VisualizationPage() {
       </div>
 
       {/* ─── Main Grid Layout ─── */}
-      <NeuralDataProvider channelCount={sourceChannelCount} targetFps={60}>
-      <SpikeEventsProvider totalSites={4096}>
+      <NeuralDataProvider
+        channelCount={sourceChannelCount}
+        targetFps={60}
+        mode={mode}
+        playbackPaused={playbackPaused}
+        playbackSampleRate={playbackSession?.sampleRate}
+      >
+      <SpikeEventsProvider totalSites={4096} mode={mode} playbackPaused={playbackPaused}>
       <div
         className="flex-1 min-h-0 grid gap-1 p-1"
         style={gridTemplate}

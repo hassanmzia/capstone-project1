@@ -27,16 +27,22 @@ interface SpikeEventsContextValue {
 
 const SpikeEventsContext = createContext<SpikeEventsContextValue | null>(null);
 
+type DataSourceMode = "simulation" | "live" | "playback";
+
 interface SpikeEventsProviderProps {
   children: ReactNode;
   totalSites?: number;
+  mode?: DataSourceMode;
+  playbackPaused?: boolean;
 }
 
 export function SpikeEventsProvider({
   children,
   totalSites = 4096,
+  mode = "simulation",
+  playbackPaused = false,
 }: SpikeEventsProviderProps) {
-  const events = useSpikeEvents({ totalSites });
+  const events = useSpikeEvents({ totalSites, mode, playbackPaused });
 
   const value = useMemo<SpikeEventsContextValue>(
     () => ({

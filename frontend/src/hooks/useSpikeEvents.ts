@@ -15,6 +15,8 @@ interface SpikeEvent {
   sortCode?: number;
 }
 
+type DataSourceMode = "simulation" | "live" | "playback";
+
 interface UseSpikeEventsConfig {
   /** Total number of electrode sites (default: 4096 for 64x64) */
   totalSites?: number;
@@ -28,6 +30,10 @@ interface UseSpikeEventsConfig {
   wsUrl?: string;
   /** Auto connect on mount (default: true) */
   autoConnect?: boolean;
+  /** Data source mode — "playback" skips WebSocket and generates spikes immediately */
+  mode?: DataSourceMode;
+  /** Whether playback is paused */
+  playbackPaused?: boolean;
 }
 
 interface UseSpikeEventsReturn {
@@ -55,7 +61,11 @@ export function useSpikeEvents(config: UseSpikeEventsConfig = {}): UseSpikeEvent
     updateIntervalMs = 100,
     wsUrl = "/ws/spike-events",
     autoConnect = true,
+    mode = "simulation",
+    playbackPaused = false,
   } = config;
+
+  const isPlayback = mode === "playback";
 
   // Persistent data stores (not React state to avoid re-render on every spike)
   const spikeCountsRef = useRef(new Float32Array(totalSites));
@@ -118,28 +128,29 @@ export function useSpikeEvents(config: UseSpikeEventsConfig = {}): UseSpikeEvent
     [totalSites]
   );
 
+  // In playback mode, skip WebSocket entirely
   const { isConnected: wsConnected } = useWebSocket({
     url: wsUrl,
     onMessage: handleMessage,
     onOpen: () => setIsConnected(true),
     onClose: () => setIsConnected(false),
-    autoConnect,
-    reconnect: true,
+    autoConnect: isPlayback ? false : autoConnect,
+    reconnect: !isPlayback,
     reconnectInterval: 2000,
   });
 
   useEffect(() => {
-    setIsConnected(wsConnected);
-  }, [wsConnected]);
+    if (!isPlayback) setIsConnected(wsConnected);
+  }, [wsConnected, isPlayback]);
 
-  // ---------- Mock spike generation when no backend / no data ----------
+  // ---------- Mock / playback spike generation ----------
   const mockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mockStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startMockSpikes = useCallback(() => {
     if (mockTimerRef.current) return;
 
-    setIsConnected(true); // Indicate demo mode active
+    setIsConnected(true);
 
     // Generate spikes at ~200/sec across ~150 active sites
     mockTimerRef.current = setInterval(() => {
@@ -180,8 +191,25 @@ export function useSpikeEvents(config: UseSpikeEventsConfig = {}): UseSpikeEvent
     }
   }, []);
 
-  // Fallback (a): no connection after 3 seconds
+  // ── Playback mode: start spikes immediately, pause/resume with playback ──
   useEffect(() => {
+    if (!isPlayback) return;
+
+    if (playbackPaused) {
+      stopMockSpikes();
+      return;
+    }
+
+    setIsConnected(true);
+    startMockSpikes();
+
+    return stopMockSpikes;
+  }, [isPlayback, playbackPaused, startMockSpikes, stopMockSpikes]);
+
+  // ── Simulation / live fallback (a): no connection after 3 seconds ──
+  useEffect(() => {
+    if (isPlayback) return;
+
     if (wsConnected) {
       stopMockSpikes();
       return;
@@ -192,10 +220,11 @@ export function useSpikeEvents(config: UseSpikeEventsConfig = {}): UseSpikeEvent
     }, 3000);
 
     return stopMockSpikes;
-  }, [wsConnected, startMockSpikes, stopMockSpikes]);
+  }, [isPlayback, wsConnected, startMockSpikes, stopMockSpikes]);
 
-  // Fallback (b): connected but no spike data received after 5 seconds
+  // ── Simulation / live fallback (b): connected but no data after 5 seconds ──
   useEffect(() => {
+    if (isPlayback) return;
     if (!wsConnected) return;
 
     hasReceivedDataRef.current = false;
@@ -207,7 +236,7 @@ export function useSpikeEvents(config: UseSpikeEventsConfig = {}): UseSpikeEvent
     }, 5000);
 
     return () => clearTimeout(noDataTimer);
-  }, [wsConnected, startMockSpikes]);
+  }, [isPlayback, wsConnected, startMockSpikes]);
 
   // Periodic update: decay rates and push state
   useEffect(() => {

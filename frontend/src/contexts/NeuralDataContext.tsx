@@ -18,18 +18,26 @@ interface NeuralDataContextValue {
 
 const NeuralDataContext = createContext<NeuralDataContextValue | null>(null);
 
+type DataSourceMode = "simulation" | "live" | "playback";
+
 interface NeuralDataProviderProps {
   children: ReactNode;
   channelCount?: number;
   targetFps?: number;
+  mode?: DataSourceMode;
+  playbackPaused?: boolean;
+  playbackSampleRate?: number;
 }
 
 export function NeuralDataProvider({
   children,
   channelCount = 64,
   targetFps = 60,
+  mode = "simulation",
+  playbackPaused = false,
+  playbackSampleRate = 30000,
 }: NeuralDataProviderProps) {
-  const stream = useDataStream({ channelCount, targetFps });
+  const stream = useDataStream({ channelCount, targetFps, mode, playbackPaused, playbackSampleRate });
 
   const value = useMemo<NeuralDataContextValue>(
     () => ({

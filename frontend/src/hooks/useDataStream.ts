@@ -42,12 +42,20 @@ function generateMockBatch(channelCount: number, batchIndex: number): Float32Arr
   return channels;
 }
 
+type DataSourceMode = "simulation" | "live" | "playback";
+
 interface DataStreamConfig {
   channelCount?: number;
   samplesPerChannel?: number;
   targetFps?: number;
   wsUrl?: string;
   autoConnect?: boolean;
+  /** Data source mode — "playback" skips WebSocket and generates recording-like data immediately */
+  mode?: DataSourceMode;
+  /** Whether playback is paused (only used in playback mode) */
+  playbackPaused?: boolean;
+  /** Sample rate from the recording (used in playback mode for realistic data) */
+  playbackSampleRate?: number;
 }
 
 interface SpikeEventData {
@@ -83,7 +91,12 @@ export function useDataStream(config: DataStreamConfig = {}): DataStreamReturn {
     targetFps = 60,
     wsUrl = "/ws/neural-data",
     autoConnect = true,
+    mode = "simulation",
+    playbackPaused = false,
+    playbackSampleRate = 30000,
   } = config;
+
+  const isPlayback = mode === "playback";
 
   const ringBufferRef = useRef<ClientRingBuffer | null>(null);
   const spikeEventsRef = useRef<SpikeEventData[]>([]);
@@ -190,31 +203,31 @@ export function useDataStream(config: DataStreamConfig = {}): DataStreamReturn {
     [channelCount, updateInterval]
   );
 
+  // In playback mode, skip WebSocket entirely
   const { isConnected: wsConnected } = useWebSocket({
     url: wsUrl,
     onMessage: handleMessage,
     onOpen: () => setIsConnected(true),
     onClose: () => setIsConnected(false),
-    autoConnect,
-    reconnect: true,
+    autoConnect: isPlayback ? false : autoConnect,
+    reconnect: !isPlayback,
     reconnectInterval: 2000,
     reconnectAttempts: 20,
   });
 
   useEffect(() => {
-    setIsConnected(wsConnected);
-  }, [wsConnected]);
+    if (!isPlayback) setIsConnected(wsConnected);
+  }, [wsConnected, isPlayback]);
 
-  // ---------- Mock data fallback when no backend ----------
+  // ---------- Mock / playback data generation ----------
   const mockBatchIndexRef = useRef(0);
   const mockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mockStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Start mock data if: (a) not connected after 3s, or (b) connected but no data after 5s
   const startMockData = useCallback(() => {
     if (mockTimerRef.current) return; // Already running
 
-    setIsConnected(true); // Indicate data is flowing (demo mode)
+    setIsConnected(true); // Indicate data is flowing
     mockBatchIndexRef.current = 0;
 
     mockTimerRef.current = setInterval(() => {
@@ -251,8 +264,27 @@ export function useDataStream(config: DataStreamConfig = {}): DataStreamReturn {
     }
   }, []);
 
-  // Fallback (a): no connection after 3 seconds
+  // ── Playback mode: start data immediately, pause/resume with playback ──
   useEffect(() => {
+    if (!isPlayback) return;
+
+    if (playbackPaused) {
+      stopMockData();
+      return;
+    }
+
+    // Start generating data immediately for playback
+    setIsConnected(true);
+    setDataRate(playbackSampleRate);
+    startMockData();
+
+    return stopMockData;
+  }, [isPlayback, playbackPaused, playbackSampleRate, startMockData, stopMockData]);
+
+  // ── Simulation / live fallback (a): no connection after 3 seconds ──
+  useEffect(() => {
+    if (isPlayback) return; // Handled above
+
     if (wsConnected) {
       stopMockData();
       return;
@@ -263,13 +295,13 @@ export function useDataStream(config: DataStreamConfig = {}): DataStreamReturn {
     }, 3000);
 
     return stopMockData;
-  }, [wsConnected, startMockData, stopMockData]);
+  }, [isPlayback, wsConnected, startMockData, stopMockData]);
 
-  // Fallback (b): connected but no data received after 5 seconds
+  // ── Simulation / live fallback (b): connected but no data after 5 seconds ──
   useEffect(() => {
+    if (isPlayback) return;
     if (!wsConnected) return;
 
-    // Reset flag when connection is (re-)established
     hasReceivedDataRef.current = false;
 
     const noDataTimer = setTimeout(() => {
@@ -279,7 +311,7 @@ export function useDataStream(config: DataStreamConfig = {}): DataStreamReturn {
     }, 5000);
 
     return () => clearTimeout(noDataTimer);
-  }, [wsConnected, startMockData]);
+  }, [isPlayback, wsConnected, startMockData]);
 
   const getLatestData = useCallback(
     (channelIndex: number, length: number): Float32Array => {
