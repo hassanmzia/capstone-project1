@@ -8,7 +8,8 @@ registration over HTTP.
 import logging
 
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
 
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def call_tool(request: Request) -> Response:
     """Invoke a registered MCP tool by name.
 
@@ -63,6 +65,7 @@ def call_tool(request: Request) -> Response:
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def list_tools(request: Request) -> Response:
     """Return all registered MCP tools."""
     server = MCPServer.get_instance()
@@ -75,6 +78,7 @@ def list_tools(request: Request) -> Response:
 # ------------------------------------------------------------------
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def list_resources(request: Request) -> Response:
     """Return all registered MCP resources."""
     registry = ResourceRegistry.get_instance()
@@ -87,6 +91,7 @@ def list_resources(request: Request) -> Response:
 # ------------------------------------------------------------------
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def register_agent(request: Request) -> Response:
     """Register an agent's tools with the MCP server.
 
