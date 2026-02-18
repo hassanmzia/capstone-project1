@@ -118,20 +118,67 @@ function loadAgentConfigs(): AgentConfig[] {
   return DEFAULT_AGENTS.map((a) => ({ ...a }));
 }
 
-/* ── Preset shape ── */
+/* ── Preset shape (with real hardware config) ── */
+type GainMode = "low" | "medium" | "high" | "ultra";
+
+interface PresetHardware {
+  sampleRateKhz: number;
+  gainMode: GainMode;
+  tiaGain: number;
+  tiaBandwidthHz: number;
+  filterOrder: number;
+  cutoffFreqHz: number;
+  arrayRows: number;
+  arrayCols: number;
+  stimEnabled: boolean;
+  stimWaveform: "biphasic" | "monophasic" | "sine" | "custom";
+  stimAmplitudeUa: number;
+  stimFreqHz: number;
+  masterClockMhz: number;
+}
+
 interface Preset {
   id: string;
   name: string;
   description: string;
   isDefault: boolean;
   createdBy: string;
+  hardware: PresetHardware;
 }
 
+const DEFAULT_HW: PresetHardware = {
+  sampleRateKhz: 30,
+  gainMode: "high",
+  tiaGain: 1000,
+  tiaBandwidthHz: 10000,
+  filterOrder: 2,
+  cutoffFreqHz: 5000,
+  arrayRows: 64,
+  arrayCols: 64,
+  stimEnabled: false,
+  stimWaveform: "biphasic",
+  stimAmplitudeUa: 10,
+  stimFreqHz: 100,
+  masterClockMhz: 50,
+};
+
 const DEFAULT_PRESETS: Preset[] = [
-  { id: "p-1", name: "Default", description: "Standard 30kHz recording configuration", isDefault: true, createdBy: "System" },
-  { id: "p-2", name: "High Density", description: "64x64 full array, high gain, reduced bandwidth", isDefault: false, createdBy: "Dr. Chen" },
-  { id: "p-3", name: "Low Noise", description: "Optimized for low-noise cortical recordings", isDefault: false, createdBy: "Dr. Patel" },
-  { id: "p-4", name: "Stimulation", description: "Closed-loop stimulation with biphasic pulses", isDefault: false, createdBy: "Dr. Kim" },
+  {
+    id: "p-1", name: "Default", description: "Standard 30kHz recording configuration", isDefault: true, createdBy: "System",
+    hardware: { ...DEFAULT_HW },
+  },
+  {
+    id: "p-2", name: "High Density", description: "64x64 full array, high gain, reduced bandwidth", isDefault: false, createdBy: "Dr. Chen",
+    hardware: { ...DEFAULT_HW, gainMode: "ultra", tiaGain: 5000, tiaBandwidthHz: 5000, cutoffFreqHz: 3000 },
+  },
+  {
+    id: "p-3", name: "Low Noise", description: "Optimized for low-noise cortical recordings", isDefault: false, createdBy: "Dr. Patel",
+    hardware: { ...DEFAULT_HW, sampleRateKhz: 20, gainMode: "medium", tiaGain: 500, filterOrder: 4, cutoffFreqHz: 3000 },
+  },
+  {
+    id: "p-4", name: "Stimulation", description: "Closed-loop stimulation with biphasic pulses", isDefault: false, createdBy: "Dr. Kim",
+    hardware: { ...DEFAULT_HW, stimEnabled: true, stimAmplitudeUa: 50, stimFreqHz: 200, stimWaveform: "biphasic" },
+  },
 ];
 
 function loadPresets(): Preset[] {
@@ -318,14 +365,18 @@ export default function SettingsPage() {
   const handleNewPreset = useCallback(() => {
     setPresets((prev) => {
       const id = `p-${Date.now()}`;
-      const updated = [
-        ...prev,
-        { id, name: `Custom Preset ${prev.length + 1}`, description: "New custom configuration", isDefault: false, createdBy: "Researcher" },
-      ];
+      const newPreset: Preset = {
+        id,
+        name: `Custom Preset ${prev.length + 1}`,
+        description: "New custom configuration",
+        isDefault: false,
+        createdBy: "Researcher",
+        hardware: { ...DEFAULT_HW },
+      };
+      const updated = [...prev, newPreset];
       savePresets(updated);
-      // Start editing the new preset immediately
       setEditingPreset(id);
-      setPresetDraft(updated[updated.length - 1]);
+      setPresetDraft(newPreset);
       return updated;
     });
   }, []);
@@ -536,58 +587,159 @@ export default function SettingsPage() {
                       }`}
                     >
                       {isEditing ? (
-                        /* ── Inline editing mode ── */
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        /* ── Inline editing mode with hardware config ── */
+                        <div className="space-y-4">
+                          {/* Basic info */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
-                              <label className="text-xs text-neural-text-muted">Name</label>
-                              <input
-                                type="text"
-                                value={draft.name}
+                              <label className="text-xs text-neural-text-muted">Preset Name</label>
+                              <input type="text" value={draft.name} autoFocus
                                 onChange={(e) => setPresetDraft((d) => d ? { ...d, name: e.target.value } : d)}
-                                className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary"
-                                autoFocus
-                              />
+                                className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary" />
                             </div>
                             <div>
                               <label className="text-xs text-neural-text-muted">Created by</label>
-                              <input
-                                type="text"
-                                value={draft.createdBy}
+                              <input type="text" value={draft.createdBy}
                                 onChange={(e) => setPresetDraft((d) => d ? { ...d, createdBy: e.target.value } : d)}
-                                className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary"
-                              />
+                                className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary" />
+                            </div>
+                            <div>
+                              <label className="text-xs text-neural-text-muted">Description</label>
+                              <input type="text" value={draft.description}
+                                onChange={(e) => setPresetDraft((d) => d ? { ...d, description: e.target.value } : d)}
+                                className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary" />
                             </div>
                           </div>
+
+                          {/* Acquisition settings */}
                           <div>
-                            <label className="text-xs text-neural-text-muted">Description</label>
-                            <input
-                              type="text"
-                              value={draft.description}
-                              onChange={(e) => setPresetDraft((d) => d ? { ...d, description: e.target.value } : d)}
-                              className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary"
-                            />
+                            <span className="text-xs font-semibold text-neural-accent-cyan uppercase tracking-wider">Acquisition</span>
+                            <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              <div>
+                                <label className="text-xs text-neural-text-muted">Sample Rate (kHz)</label>
+                                <input type="number" min={1} max={100} step={1} value={draft.hardware.sampleRateKhz}
+                                  onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, sampleRateKhz: Number(e.target.value) } } : d)}
+                                  className="mt-1 w-full bg-neural-surface border border-neural-border rounded px-2 py-1 text-xs font-mono text-neural-text-primary" />
+                              </div>
+                              <div>
+                                <label className="text-xs text-neural-text-muted">Gain Mode</label>
+                                <select value={draft.hardware.gainMode}
+                                  onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, gainMode: e.target.value as GainMode } } : d)}
+                                  className="mt-1 w-full bg-neural-surface border border-neural-border rounded px-2 py-1 text-xs font-mono text-neural-text-primary">
+                                  <option value="low">Low (100x)</option>
+                                  <option value="medium">Medium (500x)</option>
+                                  <option value="high">High (1000x)</option>
+                                  <option value="ultra">Ultra (5000x)</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-xs text-neural-text-muted">Master Clock (MHz)</label>
+                                <input type="number" min={1} max={200} step={1} value={draft.hardware.masterClockMhz}
+                                  onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, masterClockMhz: Number(e.target.value) } } : d)}
+                                  className="mt-1 w-full bg-neural-surface border border-neural-border rounded px-2 py-1 text-xs font-mono text-neural-text-primary" />
+                              </div>
+                              <div>
+                                <label className="text-xs text-neural-text-muted">Array Size</label>
+                                <div className="mt-1 flex gap-1">
+                                  <input type="number" min={1} max={128} value={draft.hardware.arrayRows}
+                                    onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, arrayRows: Number(e.target.value) } } : d)}
+                                    className="w-full bg-neural-surface border border-neural-border rounded px-2 py-1 text-xs font-mono text-neural-text-primary" />
+                                  <span className="text-neural-text-muted self-center text-xs">x</span>
+                                  <input type="number" min={1} max={128} value={draft.hardware.arrayCols}
+                                    onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, arrayCols: Number(e.target.value) } } : d)}
+                                    className="w-full bg-neural-surface border border-neural-border rounded px-2 py-1 text-xs font-mono text-neural-text-primary" />
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 pt-1">
-                            <button
-                              onClick={handleSavePreset}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-neural-accent-green/20 text-neural-accent-green hover:bg-neural-accent-green/30 border border-neural-accent-green/30 neural-transition"
-                            >
-                              <Check className="w-3 h-3" /> Save
+
+                          {/* TIA / Filter settings */}
+                          <div>
+                            <span className="text-xs font-semibold text-neural-accent-blue uppercase tracking-wider">TIA & Filter</span>
+                            <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              <div>
+                                <label className="text-xs text-neural-text-muted">TIA Gain (V/A)</label>
+                                <input type="number" min={100} max={10000} step={100} value={draft.hardware.tiaGain}
+                                  onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, tiaGain: Number(e.target.value) } } : d)}
+                                  className="mt-1 w-full bg-neural-surface border border-neural-border rounded px-2 py-1 text-xs font-mono text-neural-text-primary" />
+                              </div>
+                              <div>
+                                <label className="text-xs text-neural-text-muted">Bandwidth (Hz)</label>
+                                <input type="number" min={100} max={100000} step={100} value={draft.hardware.tiaBandwidthHz}
+                                  onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, tiaBandwidthHz: Number(e.target.value) } } : d)}
+                                  className="mt-1 w-full bg-neural-surface border border-neural-border rounded px-2 py-1 text-xs font-mono text-neural-text-primary" />
+                              </div>
+                              <div>
+                                <label className="text-xs text-neural-text-muted">Filter Order</label>
+                                <input type="number" min={1} max={8} step={1} value={draft.hardware.filterOrder}
+                                  onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, filterOrder: Number(e.target.value) } } : d)}
+                                  className="mt-1 w-full bg-neural-surface border border-neural-border rounded px-2 py-1 text-xs font-mono text-neural-text-primary" />
+                              </div>
+                              <div>
+                                <label className="text-xs text-neural-text-muted">Cutoff Freq (Hz)</label>
+                                <input type="number" min={100} max={50000} step={100} value={draft.hardware.cutoffFreqHz}
+                                  onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, cutoffFreqHz: Number(e.target.value) } } : d)}
+                                  className="mt-1 w-full bg-neural-surface border border-neural-border rounded px-2 py-1 text-xs font-mono text-neural-text-primary" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Stimulation settings */}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-neural-accent-yellow uppercase tracking-wider">Stimulation</span>
+                              <label className="flex items-center gap-1.5 cursor-pointer">
+                                <input type="checkbox" checked={draft.hardware.stimEnabled}
+                                  onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, stimEnabled: e.target.checked } } : d)}
+                                  className="w-3.5 h-3.5 rounded border-neural-border accent-neural-accent-yellow" />
+                                <span className="text-xs text-neural-text-secondary">Enable</span>
+                              </label>
+                            </div>
+                            {draft.hardware.stimEnabled && (
+                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="text-xs text-neural-text-muted">Waveform</label>
+                                  <select value={draft.hardware.stimWaveform}
+                                    onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, stimWaveform: e.target.value as PresetHardware["stimWaveform"] } } : d)}
+                                    className="mt-1 w-full bg-neural-surface border border-neural-border rounded px-2 py-1 text-xs font-mono text-neural-text-primary">
+                                    <option value="biphasic">Biphasic</option>
+                                    <option value="monophasic">Monophasic</option>
+                                    <option value="sine">Sine</option>
+                                    <option value="custom">Custom</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="text-xs text-neural-text-muted">Amplitude (uA)</label>
+                                  <input type="number" min={1} max={500} step={1} value={draft.hardware.stimAmplitudeUa}
+                                    onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, stimAmplitudeUa: Number(e.target.value) } } : d)}
+                                    className="mt-1 w-full bg-neural-surface border border-neural-border rounded px-2 py-1 text-xs font-mono text-neural-text-primary" />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-neural-text-muted">Frequency (Hz)</label>
+                                  <input type="number" min={1} max={10000} step={1} value={draft.hardware.stimFreqHz}
+                                    onChange={(e) => setPresetDraft((d) => d ? { ...d, hardware: { ...d.hardware, stimFreqHz: Number(e.target.value) } } : d)}
+                                    className="mt-1 w-full bg-neural-surface border border-neural-border rounded px-2 py-1 text-xs font-mono text-neural-text-primary" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1 border-t border-neural-border">
+                            <button onClick={handleSavePreset}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-neural-accent-green/20 text-neural-accent-green hover:bg-neural-accent-green/30 border border-neural-accent-green/30 neural-transition">
+                              <Check className="w-3 h-3" /> Save Preset
                             </button>
-                            <button
-                              onClick={handleCancelPreset}
-                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-neural-text-muted hover:text-neural-text-primary hover:bg-neural-border neural-transition"
-                            >
+                            <button onClick={handleCancelPreset}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-neural-text-muted hover:text-neural-text-primary hover:bg-neural-border neural-transition">
                               <X className="w-3 h-3" /> Cancel
                             </button>
                           </div>
                         </div>
                       ) : (
                         /* ── Display mode ── */
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div>
-                            <div className="flex items-center gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-sm font-medium text-neural-text-primary">{preset.name}</span>
                               {preset.isDefault && (
                                 <span className="px-1.5 py-0.5 rounded text-xs bg-neural-accent-green/20 text-neural-accent-green">
@@ -602,8 +754,34 @@ export default function SettingsPage() {
                             </div>
                             <p className="text-xs text-neural-text-muted mt-1">{preset.description}</p>
                             <p className="text-xs text-neural-text-muted mt-0.5">Created by: {preset.createdBy}</p>
+                            {/* Hardware summary chips */}
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              <span className="px-1.5 py-0.5 rounded bg-neural-border/50 text-[10px] font-mono text-neural-text-secondary">
+                                {preset.hardware.sampleRateKhz} kHz
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-neural-border/50 text-[10px] font-mono text-neural-text-secondary">
+                                {preset.hardware.gainMode} gain
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-neural-border/50 text-[10px] font-mono text-neural-text-secondary">
+                                TIA {preset.hardware.tiaGain}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-neural-border/50 text-[10px] font-mono text-neural-text-secondary">
+                                {preset.hardware.arrayRows}x{preset.hardware.arrayCols}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-neural-border/50 text-[10px] font-mono text-neural-text-secondary">
+                                BW {preset.hardware.tiaBandwidthHz} Hz
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-neural-border/50 text-[10px] font-mono text-neural-text-secondary">
+                                Filter {preset.hardware.filterOrder}nd @ {preset.hardware.cutoffFreqHz} Hz
+                              </span>
+                              {preset.hardware.stimEnabled && (
+                                <span className="px-1.5 py-0.5 rounded bg-neural-accent-yellow/20 text-[10px] font-mono text-neural-accent-yellow">
+                                  Stim {preset.hardware.stimWaveform} {preset.hardware.stimAmplitudeUa}uA
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1 shrink-0">
                             {!preset.isDefault && (
                               <button
                                 onClick={() => handleSetDefault(preset.id)}
