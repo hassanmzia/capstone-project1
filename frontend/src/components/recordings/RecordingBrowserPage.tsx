@@ -42,6 +42,7 @@ const seedRecordings: MockRecording[] = [
 ];
 
 const RECORDINGS_KEY = "cnea_recordings";
+const ACTIVE_SESSION_KEY = "cnea_active_recording";
 
 function loadRecordings(): MockRecording[] {
   try {
@@ -54,6 +55,33 @@ function loadRecordings(): MockRecording[] {
 
 function saveRecordings(recs: MockRecording[]) {
   localStorage.setItem(RECORDINGS_KEY, JSON.stringify(recs));
+}
+
+/** Active recording session persisted across navigation */
+interface ActiveSession {
+  phase: "setup" | "recording";
+  name: string;
+  experiment: string;
+  channels: string;
+  format: string;
+  sampleRate: string;
+  startedAt: number; // timestamp when recording began (0 if still in setup)
+}
+
+function loadActiveSession(): ActiveSession | null {
+  try {
+    const raw = localStorage.getItem(ACTIVE_SESSION_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return null;
+}
+
+function saveActiveSession(session: ActiveSession | null) {
+  if (session) {
+    localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(session));
+  } else {
+    localStorage.removeItem(ACTIVE_SESSION_KEY);
+  }
 }
 
 const availableExperiments = [
@@ -69,75 +97,134 @@ export default function RecordingBrowserPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [recordings, setRecordings] = useState<MockRecording[]>(loadRecordings);
-  const [phase, setPhase] = useState<RecordingPhase>("idle");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [sortAsc, setSortAsc] = useState(false);
 
-  // Setup form state
-  const [setupName, setSetupName] = useState("");
-  const [setupExperiment, setSetupExperiment] = useState(availableExperiments[0].id);
-  const [setupChannels, setSetupChannels] = useState("64");
-  const [setupFormat, setSetupFormat] = useState("HDF5");
-  const [setupSampleRate, setSetupSampleRate] = useState("30000");
+  // Restore active session from localStorage (survives navigation)
+  const restored = useRef(loadActiveSession());
+  const [phase, setPhase] = useState<RecordingPhase>(restored.current?.phase ?? "idle");
 
-  // Recording timer
-  const [elapsedSec, setElapsedSec] = useState(0);
+  // Setup form state — restored from active session if one exists
+  const [setupName, setSetupName] = useState(restored.current?.name ?? "");
+  const [setupExperiment, setSetupExperiment] = useState(restored.current?.experiment ?? availableExperiments[0].id);
+  const [setupChannels, setSetupChannels] = useState(restored.current?.channels ?? "64");
+  const [setupFormat, setSetupFormat] = useState(restored.current?.format ?? "HDF5");
+  const [setupSampleRate, setSetupSampleRate] = useState(restored.current?.sampleRate ?? "30000");
+
+  // Recording timer — uses startedAt timestamp so elapsed time is always correct
+  const startTimeRef = useRef<number>(restored.current?.startedAt ?? 0);
+  const [elapsedSec, setElapsedSec] = useState(() => {
+    if (restored.current?.phase === "recording" && restored.current.startedAt > 0) {
+      return Math.floor((Date.now() - restored.current.startedAt) / 1000);
+    }
+    return 0;
+  });
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTimeRef = useRef<number>(0);
+  const mountedRef = useRef(true);
 
-  // Persist recordings whenever they change
+  // Track mounted state to prevent stale updates
   useEffect(() => {
-    saveRecordings(recordings);
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  // Persist recordings whenever they change (debounced to avoid tight loops)
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveRecordings(recordings);
+    }, 100);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
   }, [recordings]);
 
-  // Simulate processing → completed after a short delay for newly stopped recordings
+  // Process "processing" → "completed" once on mount (not on every recordings change)
+  const hasProcessedRef = useRef(false);
   useEffect(() => {
-    const processing = recordings.filter((r) => r.status === "processing" && r.id.startsWith("rec-0") === false);
-    if (processing.length === 0) return;
+    if (hasProcessedRef.current) return;
+    const hasNewProcessing = recordings.some(
+      (r) => r.status === "processing" && !r.id.startsWith("rec-0"),
+    );
+    if (!hasNewProcessing) return;
 
+    hasProcessedRef.current = true;
     const timeout = setTimeout(() => {
+      if (!mountedRef.current) return;
       setRecordings((prev) =>
         prev.map((r) => {
-          if (r.status !== "processing") return r;
-          // Simulate spike sorting results
+          if (r.status !== "processing" || r.id.startsWith("rec-0")) return r;
           const durationParts = r.duration.split(":");
           const totalSec = parseInt(durationParts[0]) * 60 + parseInt(durationParts[1]);
           const estimatedSpikes = Math.round(totalSec * r.channels * (30 + Math.random() * 20));
           return { ...r, status: "completed" as const, spikeCount: estimatedSpikes };
         }),
       );
-    }, 5000); // 5-second simulated processing time
+    }, 5000);
 
     return () => clearTimeout(timeout);
-  }, [recordings]);
-
-  // Clean up timer on unmount
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Restore timer if we're resuming a recording from navigation
+  useEffect(() => {
+    if (phase === "recording" && startTimeRef.current > 0 && !timerRef.current) {
+      timerRef.current = setInterval(() => {
+        if (!mountedRef.current) return;
+        setElapsedSec(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      }, 1000);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [phase]);
 
   const nextSessionNum = 43 + recordings.filter((r) => !seedRecordings.some((s) => s.id === r.id)).length;
   const defaultName = `session_${String(nextSessionNum).padStart(3, "0")}`;
 
   const handleStartSetup = () => {
-    setSetupName(defaultName);
+    const name = defaultName;
+    setSetupName(name);
     setSetupExperiment(availableExperiments[0].id);
     setSetupChannels("64");
     setSetupFormat("HDF5");
     setSetupSampleRate("30000");
     setPhase("setup");
+    saveActiveSession({
+      phase: "setup",
+      name,
+      experiment: availableExperiments[0].id,
+      channels: "64",
+      format: "HDF5",
+      sampleRate: "30000",
+      startedAt: 0,
+    });
   };
 
   const handleBeginRecording = () => {
+    const now = Date.now();
     setElapsedSec(0);
-    startTimeRef.current = Date.now();
+    startTimeRef.current = now;
     timerRef.current = setInterval(() => {
-      setElapsedSec(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      if (!mountedRef.current) return;
+      setElapsedSec(Math.floor((Date.now() - now) / 1000));
     }, 1000);
     setPhase("recording");
+    saveActiveSession({
+      phase: "recording",
+      name: setupName,
+      experiment: setupExperiment,
+      channels: setupChannels,
+      format: setupFormat,
+      sampleRate: setupSampleRate,
+      startedAt: now,
+    });
   };
 
   const handleStopRecording = () => {
@@ -153,6 +240,7 @@ export default function RecordingBrowserPage() {
     const sizeEstMB = Math.round(channels * (parseInt(setupSampleRate) || 30000) * 2 * elapsedSec / 1e6);
 
     const id = `rec-new-${Date.now()}`;
+    hasProcessedRef.current = false; // allow processing effect to run for this new recording
     setRecordings((prev) => [
       {
         id,
@@ -170,6 +258,7 @@ export default function RecordingBrowserPage() {
       ...prev,
     ]);
     setPhase("idle");
+    saveActiveSession(null);
   };
 
   const handleCancelSetup = () => {
@@ -178,6 +267,7 @@ export default function RecordingBrowserPage() {
       timerRef.current = null;
     }
     setPhase("idle");
+    saveActiveSession(null);
   };
 
   const formatTimer = (sec: number) => {
