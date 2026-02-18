@@ -103,8 +103,14 @@ class BaseAgent:
     # Orchestrator registration
     # ------------------------------------------------------------------
 
-    async def register_with_orchestrator(self) -> None:
-        """POST the agent's MCP tools to the central MCP server."""
+    async def register_with_orchestrator(
+        self, max_retries: int = 5, base_delay: float = 2.0,
+    ) -> None:
+        """POST the agent's MCP tools to the central MCP server.
+
+        Retries with exponential backoff so agents that start before
+        Django is ready can still register successfully.
+        """
         tools_payload = self.get_mcp_tools()
         payload = {
             "agent_name": self.agent_name,
@@ -112,19 +118,31 @@ class BaseAgent:
         }
 
         url = f"{self._mcp_server_url}/agents/register"
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                response = await client.post(url, json=payload)
-                response.raise_for_status()
-                logger.info(
-                    "Registered %d tool(s) with orchestrator: %s",
-                    len(tools_payload),
-                    response.json(),
-                )
-        except httpx.HTTPError as exc:
-            logger.warning(
-                "Failed to register with orchestrator at %s: %s", url, exc,
-            )
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=10) as client:
+                    response = await client.post(url, json=payload)
+                    response.raise_for_status()
+                    logger.info(
+                        "Registered %d tool(s) with orchestrator: %s",
+                        len(tools_payload),
+                        response.json(),
+                    )
+                    return
+            except (httpx.HTTPError, httpx.ConnectError) as exc:
+                if attempt < max_retries:
+                    delay = base_delay * (2 ** (attempt - 1))
+                    logger.info(
+                        "Orchestrator not ready, retrying in %.0fs (attempt %d/%d): %s",
+                        delay, attempt, max_retries, exc,
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logger.warning(
+                        "Failed to register with orchestrator at %s after %d attempts: %s",
+                        url, max_retries, exc,
+                    )
 
     # ------------------------------------------------------------------
     # Heartbeat
