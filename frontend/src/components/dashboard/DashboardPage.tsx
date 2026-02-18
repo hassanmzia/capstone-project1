@@ -1,4 +1,5 @@
 import { useSelector, useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import type { RootState } from "@/store";
 import { startRecording, stopRecording } from "@/store/slices/recordingSlice";
 import { generateId } from "@/utils/uuid";
@@ -49,6 +50,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function DashboardPage() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const recording = useSelector((state: RootState) => state.recording);
   const agents = useSelector((state: RootState) => state.agents.agents);
   const config = useSelector((state: RootState) => state.config);
@@ -218,12 +220,18 @@ export default function DashboardPage() {
             </button>
           )}
 
-          <button className="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-border neural-transition border border-neural-border">
+          <button
+            onClick={() => navigate("/controls")}
+            className="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-border neural-transition border border-neural-border"
+          >
             <Upload className="w-5 h-5" />
             <span className="font-medium">Load Preset</span>
           </button>
 
-          <button className="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-border neural-transition border border-neural-border">
+          <button
+            onClick={() => navigate("/experiments")}
+            className="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-border neural-transition border border-neural-border"
+          >
             <FlaskConical className="w-5 h-5" />
             <span className="font-medium">New Experiment</span>
           </button>
