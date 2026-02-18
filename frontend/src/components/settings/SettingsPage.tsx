@@ -23,11 +23,11 @@ import {
 } from "lucide-react";
 
 const settingsTabs = [
-  { id: "presets", label: "Hardware Presets", icon: HardDrive },
-  { id: "users", label: "Users & Roles", icon: Users },
-  { id: "agents", label: "Agent Config", icon: Cpu },
-  { id: "llm", label: "LLM Settings", icon: Brain },
-  { id: "system", label: "System", icon: Settings },
+  { id: "presets", label: "Hardware Presets", icon: HardDrive, adminOnly: false },
+  { id: "users", label: "Users & Roles", icon: Users, adminOnly: true },
+  { id: "agents", label: "Agent Config", icon: Cpu, adminOnly: false },
+  { id: "llm", label: "LLM Settings", icon: Brain, adminOnly: false },
+  { id: "system", label: "System", icon: Settings, adminOnly: true },
 ] as const;
 
 type SettingsTab = (typeof settingsTabs)[number]["id"];
@@ -301,6 +301,11 @@ const LOG_LEVELS: AgentConfig["logLevel"][] = ["debug", "info", "warn", "error"]
 
 export default function SettingsPage() {
   const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === "Admin";
+  const visibleTabs = useMemo(
+    () => settingsTabs.filter((t) => !t.adminOnly || isAdmin),
+    [isAdmin],
+  );
   const [activeTab, setActiveTab] = useState<SettingsTab>("presets");
   const [presets, setPresets] = useState<Preset[]>(loadPresets);
   const [users, setUsers] = useState<UserEntry[]>(loadUsers);
@@ -551,7 +556,7 @@ export default function SettingsPage() {
         {/* Tabs — horizontal scroll on small screens, vertical sidebar on lg+ */}
         <div className="lg:w-56 bg-neural-surface rounded-xl border border-neural-border p-2 shrink-0">
           <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible">
-            {settingsTabs.map(({ id, label, icon: Icon }) => (
+            {visibleTabs.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
@@ -835,8 +840,8 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Users & RBAC */}
-          {activeTab === "users" && (
+          {/* Users & RBAC (Admin only) */}
+          {activeTab === "users" && isAdmin && (
             <div className="space-y-8">
               {/* ── Authentication Settings ── */}
               <div>
@@ -1407,8 +1412,8 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* System */}
-          {activeTab === "system" && (
+          {/* System (Admin only) */}
+          {activeTab === "system" && isAdmin && (
             <div>
               <h2 className="text-lg font-semibold text-neural-text-primary mb-1">System Settings</h2>
               <p className="text-sm text-neural-text-muted mb-6">

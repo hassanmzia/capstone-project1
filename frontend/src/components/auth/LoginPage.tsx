@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth, type RoleName } from "@/contexts/AuthContext";
-import { Brain, LogIn, UserPlus, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Brain, LogIn, UserPlus, Eye, EyeOff, AlertCircle, Key } from "lucide-react";
 
 type Mode = "login" | "register";
 
@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [role, setRole] = useState<RoleName>("Researcher");
+  const [inviteCode, setInviteCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -23,7 +23,6 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    // Brief delay so the UI feels responsive
     setTimeout(() => {
       if (mode === "login") {
         const result = login(email, password);
@@ -36,7 +35,7 @@ export default function LoginPage() {
         if (!name.trim()) { setError("Name is required"); setLoading(false); return; }
         if (!email.trim()) { setError("Email is required"); setLoading(false); return; }
         if (password.length < 6) { setError("Password must be at least 6 characters"); setLoading(false); return; }
-        const result = register(name.trim(), email.trim(), password, role);
+        const result = register(name.trim(), email.trim(), password, inviteCode.trim() || undefined);
         if (result.ok) {
           navigate("/", { replace: true });
         } else {
@@ -137,16 +136,23 @@ export default function LoginPage() {
 
           {mode === "register" && (
             <div>
-              <label className="block text-xs font-medium text-neural-text-secondary mb-1">Role</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as RoleName)}
-                className="w-full bg-neural-surface-alt border border-neural-border rounded-lg px-3 py-2.5 text-sm text-neural-text-primary focus:outline-none focus:border-neural-accent-cyan focus:ring-1 focus:ring-neural-accent-cyan/30 neural-transition"
-              >
-                <option value="Researcher">Researcher</option>
-                <option value="Operator">Operator</option>
-                <option value="Viewer">Viewer</option>
-              </select>
+              <label className="block text-xs font-medium text-neural-text-secondary mb-1">
+                <span className="flex items-center gap-1">
+                  <Key className="w-3 h-3" />
+                  Admin Invite Code
+                  <span className="text-neural-text-muted font-normal">(optional)</span>
+                </span>
+              </label>
+              <input
+                type="text"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="Leave blank to register as Researcher"
+                className="w-full bg-neural-surface-alt border border-neural-border rounded-lg px-3 py-2.5 text-sm text-neural-text-primary placeholder:text-neural-text-muted/50 focus:outline-none focus:border-neural-accent-cyan focus:ring-1 focus:ring-neural-accent-cyan/30 neural-transition"
+              />
+              <p className="text-[11px] text-neural-text-muted mt-1">
+                Enter an admin invite code to register as Admin. Without a code you will be registered as a Researcher.
+              </p>
             </div>
           )}
 

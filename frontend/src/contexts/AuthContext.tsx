@@ -15,7 +15,7 @@ interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => { ok: boolean; error?: string };
-  register: (name: string, email: string, password: string, role?: RoleName) => { ok: boolean; error?: string };
+  register: (name: string, email: string, password: string, inviteCode?: string) => { ok: boolean; error?: string };
   logout: () => void;
   updateProfile: (updates: Partial<Pick<AuthUser, "name" | "email">>) => void;
 }
@@ -112,11 +112,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, []);
 
-  const register = useCallback((name: string, email: string, password: string, role: RoleName = "Researcher"): { ok: boolean; error?: string } => {
+  const register = useCallback((name: string, email: string, password: string, inviteCode?: string): { ok: boolean; error?: string } => {
     const accounts = loadAccounts();
     if (accounts.some((a) => a.email.toLowerCase() === email.toLowerCase())) {
       return { ok: false, error: "An account with that email already exists" };
     }
+
+    // Admin invite code validation
+    const ADMIN_INVITE_CODE = "CNEA-ADMIN-2025";
+    let role: RoleName = "Researcher";
+    if (inviteCode) {
+      if (inviteCode === ADMIN_INVITE_CODE) {
+        role = "Admin";
+      } else {
+        return { ok: false, error: "Invalid admin invite code" };
+      }
+    }
+
     const newAccount: StoredAccount = {
       id: `u-${Date.now()}`,
       name,
