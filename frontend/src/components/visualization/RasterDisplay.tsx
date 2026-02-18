@@ -31,24 +31,27 @@ export default function RasterDisplay({
 
   const viz = useSelector((state: RootState) => state.visualization);
   const { latestSpikes, isConnected } = useSharedSpikeEvents();
-  const prevSpikeLenRef = useRef(0);
+  const lastProcessedTimeRef = useRef(0);
 
   const [windowSec] = useState(10);
 
-  // Accumulate new spikes
+  // Accumulate new spikes (tracked by timestamp since latestSpikes is a rotating buffer)
   useEffect(() => {
-    if (latestSpikes.length > prevSpikeLenRef.current) {
-      const newSpikes = latestSpikes.slice(prevSpikeLenRef.current);
-      const now = Date.now();
-      for (const spike of newSpikes) {
+    const now = Date.now();
+    let maxTs = lastProcessedTimeRef.current;
+
+    for (const spike of latestSpikes) {
+      if (spike.timestamp > lastProcessedTimeRef.current) {
         const ch = spike.channelId ?? spike.siteIndex % maxChannels;
         spikesRef.current.push({
           channel: ch,
           time: (now - startTimeRef.current) / 1000,
         });
+        if (spike.timestamp > maxTs) maxTs = spike.timestamp;
       }
     }
-    prevSpikeLenRef.current = latestSpikes.length;
+
+    lastProcessedTimeRef.current = maxTs;
   }, [latestSpikes, maxChannels]);
 
   // Rendering loop
