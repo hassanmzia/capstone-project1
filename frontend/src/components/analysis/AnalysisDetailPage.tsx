@@ -94,40 +94,54 @@ const mockAnalysisDb: Record<string, AnalysisDetail> = {
     type: "PCA Analysis",
     recording: "session_042",
     experimentName: "Hippocampal CA1 Place Cell Study",
-    status: "running",
-    progress: 67,
-    duration: "2m 10s",
+    status: "completed",
+    progress: 100,
+    duration: "3m 45s",
+    result: "3 components, 85.2% variance",
     startedAt: "2026-02-18 10:05",
-    completedAt: "",
-    result: "",
+    completedAt: "2026-02-18 10:09",
     parameters: [
       { label: "Components", value: "3" },
       { label: "Feature Space", value: "Waveform peaks + PCA" },
       { label: "Normalization", value: "Z-score" },
       { label: "Channels", value: "All (64)" },
     ],
-    outputs: [],
-    notes: "Running PCA for spike feature extraction. First 3 components explain ~85% of variance. Pending completion.",
+    outputs: [
+      { label: "PC1 Variance", value: "52.3%" },
+      { label: "PC2 Variance", value: "21.8%" },
+      { label: "PC3 Variance", value: "11.1%" },
+      { label: "Total Explained", value: "85.2%" },
+      { label: "Clusters Found", value: "3" },
+      { label: "Silhouette Score", value: "0.78" },
+    ],
+    notes: "PCA spike feature extraction completed successfully. First 3 components explain 85.2% of variance. K-means clustering identified 3 distinct unit groups with good separation (silhouette score 0.78).",
   },
   "a-004": {
     id: "a-004",
     type: "Cross-Correlation",
     recording: "session_040",
     experimentName: "Cortical Spike Timing Analysis",
-    status: "queued",
-    progress: 0,
-    duration: "--",
-    startedAt: "",
-    completedAt: "",
-    result: "",
+    status: "completed",
+    progress: 100,
+    duration: "5m 12s",
+    result: "48 significant pairs",
+    startedAt: "2026-02-18 10:10",
+    completedAt: "2026-02-18 10:15",
     parameters: [
       { label: "Bin Size", value: "0.5 ms" },
       { label: "Window", value: "+/- 50 ms" },
       { label: "Unit Pairs", value: "All pairwise" },
       { label: "Significance", value: "p < 0.01 (jitter)" },
     ],
-    outputs: [],
-    notes: "Queued for execution. Will compute all pairwise cross-correlograms between sorted units from session_040.",
+    outputs: [
+      { label: "Total Pairs Tested", value: "820" },
+      { label: "Significant Pairs", value: "48" },
+      { label: "Excitatory Connections", value: "31" },
+      { label: "Inhibitory Connections", value: "17" },
+      { label: "Mean Peak Latency", value: "2.3 ms" },
+      { label: "Strongest Pair CC", value: "0.42" },
+    ],
+    notes: "Cross-correlation analysis completed. Found 48 significant pairwise connections out of 820 tested pairs. Network shows predominantly excitatory connections with short latencies consistent with monosynaptic transmission.",
   },
 };
 
@@ -337,7 +351,7 @@ function PCAScatterChart() {
 
   return (
     <div>
-      <p className="text-xs text-neural-text-muted mb-2">PCA Cluster Projection (partial — 67%)</p>
+      <p className="text-xs text-neural-text-muted mb-2">PCA Cluster Projection (3 components, 85.2% variance)</p>
       <canvas ref={canvasRef} width={320} height={180} className="w-full rounded bg-neural-surface-alt border border-neural-border" />
       <div className="flex items-center gap-3 mt-2 text-xs text-neural-text-muted">
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-cyan-400 inline-block" /> Cluster 1</span>
