@@ -64,6 +64,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         msg_type = payload.get("type", "chat.message")
         content = payload.get("content", "")
         session_id = payload.get("session_id")
+        model = payload.get("model")  # e.g. "openai/gpt-4o"
 
         # Track session group for potential multi-tab broadcasting.
         if session_id and session_id != self.session_id:
@@ -76,11 +77,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         logger.debug("Chat WS received (%s): %.80s…", msg_type, content)
 
-        await self._stream_from_agent(content, session_id)
+        await self._stream_from_agent(content, session_id, model)
 
     # ── Helpers ──────────────────────────────────────────────────────────
 
-    async def _stream_from_agent(self, content: str, session_id: str | None):
+    async def _stream_from_agent(
+        self, content: str, session_id: str | None, model: str | None = None
+    ):
         """Forward the message to agent-llm and stream the response back."""
         chat_url = f"{AGENT_LLM_URL}/chat"
         request_body = {
@@ -88,6 +91,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "session_id": session_id,
             "stream": True,
         }
+        if model:
+            request_body["model"] = model
 
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0)) as client:

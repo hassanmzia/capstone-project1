@@ -1,6 +1,13 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import type { ChatMessage, ToolCall } from "@/types/neural";
 
+export interface LLMModel {
+  id: string;
+  name: string;
+  provider: string;
+  description: string;
+}
+
 interface ChatState {
   messages: ChatMessage[];
   isStreaming: boolean;
@@ -8,6 +15,8 @@ interface ChatState {
   isPanelOpen: boolean;
   error: string | null;
   suggestedActions: string[];
+  selectedModelId: string;
+  availableModels: LLMModel[];
 }
 
 const initialState: ChatState = {
@@ -28,6 +37,15 @@ const initialState: ChatState = {
     "Show system status",
     "Load default preset",
     "Run spike sorting",
+  ],
+  selectedModelId: "ollama/deepseek-r1:7b",
+  availableModels: [
+    { id: "ollama/deepseek-r1:7b", name: "DeepSeek-R1 7B", provider: "ollama", description: "Local - fast reasoning model (default)" },
+    { id: "ollama/llama3:8b", name: "Llama 3 8B", provider: "ollama", description: "Local - Meta's open model" },
+    { id: "openai/gpt-4o", name: "GPT-4o", provider: "openai", description: "OpenAI - flagship multimodal model" },
+    { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", provider: "openai", description: "OpenAI - fast and affordable" },
+    { id: "anthropic/claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", provider: "anthropic", description: "Anthropic - balanced speed & intelligence" },
+    { id: "anthropic/claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "anthropic", description: "Anthropic - fast and compact" },
   ],
 };
 
@@ -83,6 +101,12 @@ const chatSlice = createSlice({
     setSuggestedActions(state, action: PayloadAction<string[]>) {
       state.suggestedActions = action.payload;
     },
+    setSelectedModel(state, action: PayloadAction<string>) {
+      state.selectedModelId = action.payload;
+    },
+    setAvailableModels(state, action: PayloadAction<LLMModel[]>) {
+      state.availableModels = action.payload;
+    },
     clearMessages(state) {
       state.messages = [initialState.messages[0]];
       state.sessionId = null;
@@ -93,7 +117,8 @@ const chatSlice = createSlice({
 export const {
   addMessage, updateLastMessage, addToolCallToMessage, updateToolCallStatus,
   setStreaming, setSessionId, togglePanel, openPanel, closePanel,
-  setChatError, setSuggestedActions, clearMessages,
+  setChatError, setSuggestedActions, setSelectedModel, setAvailableModels,
+  clearMessages,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

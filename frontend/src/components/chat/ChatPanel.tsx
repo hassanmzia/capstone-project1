@@ -8,6 +8,7 @@ import {
   setStreaming,
   setSuggestedActions,
   setSessionId,
+  setSelectedModel,
 } from "@/store/slices/chatSlice";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import {
@@ -20,6 +21,7 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
+  ChevronDown,
 } from "lucide-react";
 import type { ChatMessage, ToolCall } from "@/types/neural";
 import { generateId } from "@/utils/uuid";
@@ -90,9 +92,85 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   );
 }
 
+function ModelSelector() {
+  const dispatch = useDispatch();
+  const { selectedModelId, availableModels } = useSelector(
+    (state: RootState) => state.chat
+  );
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedModel = availableModels.find((m) => m.id === selectedModelId);
+  const providerColor: Record<string, string> = {
+    ollama: "text-neural-accent-green",
+    openai: "text-neural-accent-amber",
+    anthropic: "text-neural-accent-purple",
+  };
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs bg-neural-surface-alt border border-neural-border hover:border-neural-accent-cyan/40 neural-transition"
+      >
+        <span className={providerColor[selectedModel?.provider ?? "ollama"]}>
+          {selectedModel?.name ?? "Select model"}
+        </span>
+        <ChevronDown className={`w-3 h-3 text-neural-text-muted transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-1 w-64 bg-neural-surface border border-neural-border rounded-lg shadow-xl z-50 py-1 max-h-72 overflow-y-auto">
+          {["ollama", "openai", "anthropic"].map((provider) => {
+            const models = availableModels.filter((m) => m.provider === provider);
+            if (models.length === 0) return null;
+            return (
+              <div key={provider}>
+                <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-neural-text-muted">
+                  {provider === "ollama" ? "Local (Ollama)" : provider === "openai" ? "OpenAI" : "Anthropic"}
+                </div>
+                {models.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => {
+                      dispatch(setSelectedModel(model.id));
+                      setIsOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 hover:bg-neural-surface-alt neural-transition ${
+                      model.id === selectedModelId ? "bg-neural-accent-cyan/10" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-neural-text-primary">{model.name}</span>
+                      {model.id === selectedModelId && (
+                        <CheckCircle2 className="w-3 h-3 text-neural-accent-cyan" />
+                      )}
+                    </div>
+                    <div className="text-[10px] text-neural-text-muted mt-0.5">{model.description}</div>
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ChatPanel() {
   const dispatch = useDispatch();
-  const { messages, isPanelOpen, isStreaming, suggestedActions, sessionId } = useSelector(
+  const { messages, isPanelOpen, isStreaming, suggestedActions, sessionId, selectedModelId } = useSelector(
     (state: RootState) => state.chat
   );
   const [input, setInput] = useState("");
@@ -180,6 +258,7 @@ export default function ChatPanel() {
       type: "chat.message",
       session_id: sessionId,
       content: input.trim(),
+      model: selectedModelId,
     });
 
     setInput("");
@@ -201,6 +280,7 @@ export default function ChatPanel() {
           <span className={`w-2 h-2 rounded-full ${isConnected ? "bg-neural-accent-green" : "bg-neural-text-muted"}`} title={isConnected ? "Connected" : "Disconnected"} />
         </div>
         <div className="flex items-center gap-1">
+          <ModelSelector />
           <button
             onClick={() => dispatch(closePanel())}
             className="p-1.5 rounded-lg text-neural-text-muted hover:text-neural-text-primary hover:bg-neural-surface-alt neural-transition"
