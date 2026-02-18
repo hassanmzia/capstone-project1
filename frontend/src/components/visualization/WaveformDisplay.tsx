@@ -13,7 +13,7 @@ import {
   resetView,
 } from "@/store/slices/visualizationSlice";
 import { WaveformWebGLRenderer } from "@/components/common/WebGLRenderer";
-import { useDataStream } from "@/hooks/useDataStream";
+import { useNeuralData } from "@/contexts/NeuralDataContext";
 import {
   ZoomIn,
   ZoomOut,
@@ -84,10 +84,7 @@ export default function WaveformDisplay({
     amplitude: string;
   } | null>(null);
 
-  const { getLatestData, isConnected, dataRate } = useDataStream({
-    channelCount: 64,
-    targetFps: 60,
-  });
+  const { getLatestData, isConnected, dataRate } = useNeuralData();
 
   const samplesInView = useMemo(
     () => Math.round((viz.timebaseMs / 1000) * sampleRate),

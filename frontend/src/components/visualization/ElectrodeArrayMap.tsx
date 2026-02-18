@@ -5,7 +5,7 @@
  */
 
 import React, { useCallback, useState, useMemo, useRef, useEffect } from "react";
-import { useSpikeEvents } from "@/hooks/useSpikeEvents";
+import { useSharedSpikeEvents } from "@/contexts/SpikeEventsContext";
 import { rowColToSite, getSiteLabel, ARRAY_ROWS, ARRAY_COLS } from "@/utils/siteConversion";
 import { neuralActivity, viridis, coolwarm, type ColormapFn } from "@/utils/colorMaps";
 
@@ -60,7 +60,7 @@ export default function ElectrodeArrayMap({
   });
   const [currentOverlay, setCurrentOverlay] = useState<OverlayMode>(overlayMode);
 
-  const { spikeRate } = useSpikeEvents({ totalSites: ARRAY_ROWS * ARRAY_COLS });
+  const { spikeRate } = useSharedSpikeEvents();
 
   // Sync external selection
   useEffect(() => {

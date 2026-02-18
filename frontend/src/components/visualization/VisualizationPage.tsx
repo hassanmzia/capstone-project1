@@ -36,6 +36,10 @@ import PCBDataDisplay from "./PCBDataDisplay";
 import TelemetryPanel from "./TelemetryPanel";
 import RasterDisplay from "./RasterDisplay";
 
+// Shared data contexts
+import { NeuralDataProvider } from "@/contexts/NeuralDataContext";
+import { SpikeEventsProvider } from "@/contexts/SpikeEventsContext";
+
 // Icons
 import {
   Activity,
@@ -243,6 +247,8 @@ export default function VisualizationPage() {
       </div>
 
       {/* ─── Main Grid Layout ─── */}
+      <NeuralDataProvider channelCount={64} targetFps={60}>
+      <SpikeEventsProvider totalSites={4096}>
       <div
         className="flex-1 min-h-0 grid gap-1 p-1"
         style={gridTemplate}
@@ -422,6 +428,8 @@ export default function VisualizationPage() {
           </div>
         )}
       </div>
+      </SpikeEventsProvider>
+      </NeuralDataProvider>
     </div>
   );
 }

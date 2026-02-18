@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
-import { useDataStream } from "@/hooks/useDataStream";
+import { useNeuralData } from "@/contexts/NeuralDataContext";
 import { viridis, buildLUT, type ColormapFn, COLORMAPS } from "@/utils/colorMaps";
 
 interface SpectrogramDisplayProps {
@@ -44,7 +44,7 @@ export default function SpectrogramDisplay({
   const [maxFrequency, setMaxFrequency] = useState(propMaxFreq ?? 5000);
   const [dynamicRange, setDynamicRange] = useState(80); // dB
 
-  const { getLatestData } = useDataStream({ channelCount: 64, targetFps: 20 });
+  const { getLatestData } = useNeuralData();
 
   const colormap: ColormapFn = useMemo(
     () => COLORMAPS[colormapName] ?? viridis,
