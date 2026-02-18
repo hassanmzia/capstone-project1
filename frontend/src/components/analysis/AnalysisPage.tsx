@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart3,
   Play,
@@ -29,25 +30,8 @@ const analysisTypes = [
 ];
 
 export default function AnalysisPage() {
+  const navigate = useNavigate();
   const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [jobs, setJobs] = useState(analysisJobs);
-
-  const handleNewAnalysis = useCallback(() => {
-    const typeName = selectedType || "Spike Sorting";
-    const id = `a-${String(jobs.length + 1).padStart(3, "0")}`;
-    setJobs((prev) => [
-      {
-        id,
-        type: typeName,
-        recording: `session_${String(42 + prev.length).padStart(3, "0")}`,
-        status: "queued",
-        progress: 0,
-        duration: "--",
-        result: "",
-      },
-      ...prev,
-    ]);
-  }, [selectedType, jobs.length]);
 
   return (
     <div className="flex flex-col gap-4 h-full">
@@ -58,7 +42,7 @@ export default function AnalysisPage() {
           <h1 className="text-lg font-semibold text-neural-text-primary">Analysis</h1>
         </div>
         <button
-          onClick={handleNewAnalysis}
+          onClick={() => navigate("/analysis/new")}
           className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-green/20 text-neural-accent-green hover:bg-neural-accent-green/30 border border-neural-accent-green/30 neural-transition"
         >
           <Play className="w-4 h-4" />
@@ -99,10 +83,11 @@ export default function AnalysisPage() {
             Analysis Jobs
           </h2>
           <div className="space-y-3">
-            {jobs.map((job) => (
+            {analysisJobs.map((job) => (
               <div
                 key={job.id}
-                className="p-4 rounded-lg bg-neural-surface-alt border border-neural-border"
+                onClick={() => navigate(`/analysis/${job.id}`)}
+                className="p-4 rounded-lg bg-neural-surface-alt border border-neural-border hover:border-neural-border-bright neural-transition cursor-pointer"
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
