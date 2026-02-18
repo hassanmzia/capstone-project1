@@ -15,6 +15,7 @@ import {
   BarChart3,
   Layers,
 } from "lucide-react";
+import type { MockRecording } from "./RecordingBrowserPage";
 
 interface RecordingDetail {
   id: string;
@@ -39,6 +40,7 @@ interface RecordingDetail {
   sortedUnits: number;
 }
 
+/** Rich detail data for the original seed recordings */
 const mockRecordingsDb: Record<string, RecordingDetail> = {
   "rec-042": {
     id: "rec-042",
@@ -174,6 +176,84 @@ const mockRecordingsDb: Record<string, RecordingDetail> = {
   },
 };
 
+/** Map experiment names back to IDs */
+const experimentIdMap: Record<string, string> = {
+  "Hippocampal CA1 Place Cell Study": "exp-001",
+  "Cortical Spike Timing Analysis": "exp-002",
+  "Retinal Ganglion Response Mapping": "exp-003",
+  "Drug Screening - Compound 47B": "exp-004",
+};
+
+/** Electrode defaults by channel count */
+const electrodeByChannels: Record<number, string> = {
+  16: "16ch Linear Probe (NeuroNexus A1x16)",
+  32: "32ch Multi-shank (Cambridge NeuroTech)",
+  64: "64ch Silicon Probe (NeuroNexus A1x64)",
+  128: "128ch MEA (Multi Channel Systems)",
+};
+
+/**
+ * Build a RecordingDetail from a MockRecording stored in localStorage.
+ * Generates plausible stats for user-created recordings.
+ */
+function detailFromBrowser(rec: MockRecording): RecordingDetail {
+  const durationParts = rec.duration.split(":");
+  const totalSec = parseInt(durationParts[0]) * 60 + parseInt(durationParts[1]);
+  const isCompleted = rec.status === "completed";
+  const sr = rec.sampleRate ? parseInt(rec.sampleRate) : 30000;
+
+  const meanFR = isCompleted ? `${(rec.spikeCount / Math.max(totalSec, 1) / rec.channels).toFixed(1)} Hz` : "—";
+  const peakAmp = isCompleted ? `${180 + Math.round(rec.channels * 1.2)} uV` : "—";
+  const snr = isCompleted ? `${(8 + (rec.channels / 32) * 2).toFixed(1)} dB` : "—";
+  const sortedUnits = isCompleted ? Math.max(1, Math.round(rec.channels * 0.2)) : 0;
+  const burstCount = isCompleted ? Math.round(rec.spikeCount * 0.005) : 0;
+
+  return {
+    id: rec.id,
+    name: rec.name,
+    experimentId: experimentIdMap[rec.experimentName] ?? "exp-001",
+    experimentName: rec.experimentName,
+    date: rec.date,
+    duration: rec.duration,
+    spikeCount: rec.spikeCount,
+    channels: rec.channels,
+    fileSize: rec.fileSize,
+    format: rec.format,
+    status: rec.status,
+    sampleRate: `${sr.toLocaleString()} Hz`,
+    bandpass: "300 Hz – 6 kHz",
+    electrode: electrodeByChannels[rec.channels] ?? `${rec.channels}ch Electrode Array`,
+    notes: isCompleted
+      ? "Recording completed and spike sorting finished. Data is ready for analysis."
+      : rec.status === "processing"
+      ? "Data acquired and spike sorting is in progress. Statistics will update when complete."
+      : "Recording session data.",
+    meanFiringRate: meanFR,
+    peakAmplitude: peakAmp,
+    snr,
+    burstCount,
+    sortedUnits,
+  };
+}
+
+/** Look up recording: first check rich mock data, then fall back to localStorage browser list */
+function findRecording(id: string): RecordingDetail | null {
+  // Check hardcoded rich detail data first
+  if (mockRecordingsDb[id]) return mockRecordingsDb[id];
+
+  // Fall back to localStorage recordings list
+  try {
+    const raw = localStorage.getItem("cnea_recordings");
+    if (raw) {
+      const all: MockRecording[] = JSON.parse(raw);
+      const found = all.find((r) => r.id === id);
+      if (found) return detailFromBrowser(found);
+    }
+  } catch { /* ignore */ }
+
+  return null;
+}
+
 function statusBadge(status: string) {
   const map: Record<string, string> = {
     completed: "bg-neural-accent-green/20 text-neural-accent-green",
@@ -291,7 +371,7 @@ export default function RecordingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const rec = id ? mockRecordingsDb[id] : null;
+  const rec = id ? findRecording(id) : null;
 
   if (!rec) {
     return (
