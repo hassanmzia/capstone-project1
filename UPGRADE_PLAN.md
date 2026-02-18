@@ -2,9 +2,21 @@
 
 ## Executive Summary
 
-Transform the existing monolithic Python/PyQt5 desktop GUI into a **professional-grade, multi-agent, web-based neural interfacing platform** using a modern stack: Django + PostgreSQL backend, React + TypeScript frontend, Docker Compose orchestration, and an MCP/A2A multi-agent architecture for real-time neural data acquisition, processing, visualization, and AI-assisted analysis.
+Transform the existing monolithic Python/PyQt5 desktop GUI into a **professional-grade, multi-agent, web-based neural interfacing platform** using a modern stack: Django + PostgreSQL backend, React + TypeScript frontend, Docker Compose orchestration, MCP/A2A multi-agent architecture, and **LLM-powered conversational control** (DeepSeek-R1:7b via Ollama on RTX 5090) with RAG-based institutional memory for real-time neural data acquisition, processing, visualization, and AI-assisted analysis.
 
 **Access URL:** `http://172.168.1.95:3025`
+
+### Agentic Framework Stack
+| Layer | Framework | Purpose |
+|-------|-----------|---------|
+| **LLM Agent Orchestration** | **LangGraph** | Stateful multi-agent workflows, MCP tool-calling, conditional routing |
+| **Observability/Tracing** | **LangFuse** (self-hosted) | Trace all LLM calls, latency, token usage, prompt management |
+| **A2A Communication** | **Google A2A Python SDK** | Agent discovery, agent cards, task protocol |
+| **MCP Integration** | **MCP Python SDK** | Tool/resource registration, protocol compliance |
+| **LLM Provider** | **Ollama** (DeepSeek-R1:7b) | Chat, reasoning, tool calling (localhost:12434, RTX 5090) |
+| **Embeddings** | **Ollama** (nomic-embed-text) | RAG vector embeddings (768 dims) |
+| **Vector Store** | **pgvector** (PostgreSQL extension) | Similarity search for RAG |
+| **Data Pipeline Agents** | **FastAPI** | Raw performance agents — no LLM overhead |
 
 ---
 
@@ -94,7 +106,10 @@ All existing features from the current PyQt5 GUI will be preserved and enhanced:
 | **Storage Agent** | 8091 | HTTP | Data persistence, HDF5, export |
 | **AI/ML Agent** | 8092 | HTTP | Neural decoding, pattern recognition |
 | **Notification Agent** | 8093 | HTTP | Alerts, email, system notifications |
+| **LLM Agent (LangGraph)** | 8094 | HTTP/WS | Conversational control, RAG, report generation |
+| **LangFuse** | 8095 | HTTP | LLM observability dashboard |
 | **MCP Server** | 8087 | HTTP | Model Context Protocol registry |
+| **Ollama** | 12434 | HTTP | LLM inference (host network, existing) |
 | **Nginx Reverse Proxy** | 3025 | HTTP | Entry point (shared with frontend) |
 
 ---
@@ -204,7 +219,281 @@ All existing features from the current PyQt5 GUI will be preserved and enhanced:
 - Monitors system health metrics
 - Publishes alerts when thresholds exceeded
 
-#### Agent 7: MCP Orchestrator (Django)
+#### Agent 7: LLM Agent (LangGraph + Ollama)
+**Port:** 8094
+**Responsibility:** Conversational system control, RAG-based knowledge retrieval, report generation
+**LLM:** DeepSeek-R1:7b via Ollama (localhost:12434, RTX 5090 GPU)
+**Embedding Model:** nomic-embed-text via Ollama (768 dims, ~0.5 GB VRAM)
+
+**MCP Tools Exposed:**
+- `chat` — Natural language conversation with tool-calling capability
+- `query_knowledge` — RAG search across experiment history
+- `generate_report` — LLM-generated experiment reports
+- `suggest_parameters` — AI parameter optimization with explanations
+- `explain_anomaly` — Natural language explanation of detected anomalies
+- `natural_language_query` — Convert natural language to data queries
+
+**A2A Communication:**
+- Has access to ALL other agents' MCP tools (routes via LangGraph tool-calling)
+- Subscribes to anomaly events from AI/ML Agent for auto-explanation
+- Publishes chat responses via WebSocket to frontend
+
+**LangGraph State Machine:**
+```
+User Input
+    │
+    ▼
+┌───────────┐     ┌──────────────┐     ┌─────────────────┐
+│  Router   │────►│  Tool Caller │────►│  Response Gen   │
+│  (intent  │     │  (MCP tools  │     │  (format answer │
+│  classify)│     │   via A2A)   │     │   for user)     │
+└───────────┘     └──────────────┘     └─────────────────┘
+    │                                          │
+    │  "analyze"        "remember"             │
+    ▼                   ▼                      │
+┌───────────┐  ┌───────────────┐               │
+│  RAG Query│  │  Memory Write │               │
+│  (pgvector│  │  (store new   │               │
+│   search) │  │   knowledge)  │───────────────┘
+└───────────┘  └───────────────┘
+```
+
+**Conversational Features:**
+- *"Start recording at 10kHz with gain x100 on the frontal array"* → parses intent, calls MCP tools
+- *"What bias settings worked best for cortical recordings?"* → RAG search + summarize
+- *"Show me all recordings with spike rate above 50 Hz"* → generates SQL/filters
+- *"My signals look noisy on channels 200-250, what should I adjust?"* → RAG + parameter suggestion
+- *"Generate a summary report for today's experiments"* → report generation with LLM
+
+### 3.1.1 LangGraph Memory Design
+
+#### Short-Term Memory (Within a Session)
+
+Conversation state that lives for the duration of a single user session, managed by LangGraph's state graph.
+
+```
+┌─────────────────────────────────────────────────────┐
+│  LangGraph State (Short-Term Memory)                │
+│                                                      │
+│  ┌────────────────────────────────────────────────┐ │
+│  │  messages: [                                    │ │
+│  │    {role: "user", content: "Start recording"},  │ │
+│  │    {role: "ai", content: "Recording started",   │ │
+│  │     tool_calls: [{name: "start_recording"}]},   │ │
+│  │    ...                                          │ │
+│  │  ]                                              │ │
+│  ├────────────────────────────────────────────────┤ │
+│  │  system_context: {                              │ │
+│  │    active_recording: true,                      │ │
+│  │    recording_id: 47,                            │ │
+│  │    device: "CNEAv5_Unit3",                      │ │
+│  │    current_config: {gain: "x100", ...},         │ │
+│  │    selected_channels: [200, 201, 202],          │ │
+│  │    last_spike_rates: {200: 45.2, 201: 12.1},   │ │
+│  │  }                                              │ │
+│  ├────────────────────────────────────────────────┤ │
+│  │  tool_results: [                                │ │
+│  │    {tool: "get_spike_rate", result: {...}},      │ │
+│  │    {tool: "get_signal_quality", result: {...}},  │ │
+│  │  ]                                              │ │
+│  └────────────────────────────────────────────────┘ │
+│                                                      │
+│  Lifetime: Single session                            │
+│  Storage: Redis (fast) + PostgreSQL checkpoint       │
+│  Summarization: After ~50 messages, older messages   │
+│  are summarized by LLM into compact context          │
+└─────────────────────────────────────────────────────┘
+```
+
+**LangGraph Checkpointer (Session Persistence):**
+```python
+from langgraph.checkpoint.postgres import PostgresSaver
+
+checkpointer = PostgresSaver(conn_string="postgresql://...@postgres:5432/neural_interface")
+graph = StateGraph(NeuralAssistantState)
+app = graph.compile(checkpointer=checkpointer)
+
+# User can close browser, come back, resume where they left off
+config = {"configurable": {"thread_id": f"user_{user_id}_session_{session_id}"}}
+result = app.invoke({"messages": [user_message]}, config)
+```
+
+#### Long-Term Memory (Across Sessions — Permanent)
+
+Persists forever in PostgreSQL + pgvector. Divided into three types:
+
+**1. Semantic Memory (pgvector embeddings) — "What does the system know?"**
+- Past experiment summaries (auto-embedded after each recording)
+- Successful parameter configurations + their outcomes
+- Known electrode issues (e.g., "site 1847 = noisy since Feb 10")
+- Troubleshooting solutions that worked
+
+**2. Episodic Memory (structured DB records) — "What happened before?"**
+- Full session history with timestamps
+- Configuration change events
+- Anomaly occurrences + resolutions
+- User interactions with outcomes
+
+**3. Procedural Memory (learned preferences) — "How does this user work?"**
+- Dr. Wang always uses gain x100 for cortical recordings
+- Dr. Wang prefers spike threshold at 4σ not 5σ
+- Lab protocol: always run impedance test first
+- Default export format: NWB (not HDF5)
+
+**Memory Interaction Flow:**
+```
+User: "Set up for an in-vivo recording like last Tuesday"
+         │
+         ▼
+  SHORT-TERM: Current context (device, no active recording)
+         │
+         ▼
+  LONG-TERM SEMANTIC (RAG): Vector search → found Exp #42, Feb 10
+         │
+         ▼
+  LONG-TERM PROCEDURAL: User preferences (impedance check first, 4σ)
+         │
+         ▼
+  LLM RESPONSE: "I'll set up like Experiment #42:
+    1. Run impedance check first (your standard protocol)
+    2. Load invivo_v2 bias preset
+    3. Set gain x300, threshold 4σ (your preference)
+    Shall I proceed?"
+```
+
+### 3.1.2 RAG (Retrieval-Augmented Generation) System
+
+#### RAG Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     RAG Pipeline                              │
+│                                                               │
+│  User Query → Embed (nomic-embed-text via Ollama)            │
+│                    │                                          │
+│                    ▼                                          │
+│            pgvector Similarity Search                         │
+│            (Top-K relevant documents)                         │
+│                    │                                          │
+│                    ▼                                          │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │  LLM Prompt = System Prompt + Retrieved Docs + Query    │ │
+│  │  Model: DeepSeek-R1:7b via Ollama                       │ │
+│  └─────────────────────────────────────────────────────────┘ │
+│                    │                                          │
+│                    ▼                                          │
+│              Grounded Response                                │
+│  (Answer with citations from actual experiment history)       │
+└──────────────────────────────────────────────────────────────┘
+```
+
+#### RAG Document Sources
+
+| Source | Auto-indexed | Example Content |
+|--------|-------------|-----------------|
+| **Experiment summaries** | After each recording completes | "Exp #42: gain x300, BP_OTA=1.5V, cortical, SNR=12.3 dB" |
+| **Config snapshots** | On every config change | "All 20 bias values + gain + clock + outcome" |
+| **Researcher annotations** | When user adds notes | "Channel 200-250 noise fixed by regrounding" |
+| **Troubleshooting history** | On anomaly resolution | "USB dropout at 80 MB/s → reduced buffer to 60" |
+| **Chat conversations** | After each session | Past Q&A pairs with tool call results |
+| **Protocol documents** | Manual upload | SOPs, hardware docs, safety limits |
+
+#### RAG Database Schema
+
+```sql
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Document store for RAG
+CREATE TABLE rag_documents (
+    id SERIAL PRIMARY KEY,
+    source_type VARCHAR(50) NOT NULL,
+    -- 'experiment', 'config', 'annotation', 'troubleshooting', 'protocol', 'chat'
+    source_id INTEGER,
+    title VARCHAR(500),
+    content TEXT NOT NULL,
+    embedding vector(768),         -- nomic-embed-text produces 768-dim vectors
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- HNSW index for fast similarity search
+CREATE INDEX ON rag_documents
+    USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 16, ef_construction = 64);
+
+-- Chat history (also searchable via RAG)
+CREATE TABLE chat_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    session_id VARCHAR(100),
+    role VARCHAR(20) NOT NULL,       -- 'user', 'assistant', 'system', 'tool'
+    content TEXT NOT NULL,
+    tool_calls JSONB,
+    embedding vector(768),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX ON chat_history
+    USING hnsw (embedding vector_cosine_ops);
+```
+
+#### Embedding Pipeline
+
+```
+New Data Created (experiment, annotation, config change)
+        │
+        ▼
+  Chunking (~500 tokens, overlapping, with metadata)
+        │
+        ▼
+  Ollama Embedding: POST http://localhost:12434/api/embeddings
+  Model: nomic-embed-text (768 dims, ~0.5 GB VRAM)
+        │
+        ▼
+  pgvector INSERT into rag_documents table
+```
+
+#### When RAG Triggers Automatically
+
+| User Action | RAG Behavior |
+|-------------|-------------|
+| Asks question in chat | Search experiment history + troubleshooting for context |
+| Starts new experiment | Retrieve similar past experiments + outcomes |
+| Anomaly detected | Search for past occurrences + solutions |
+| Generates report | Pull related annotations, configs, quality metrics |
+| Changes parameters | Find past recordings with similar params + results |
+| Views noisy channel | Search for past fixes for that electrode/region |
+
+#### Example RAG Flow
+
+```
+Dr. Wang: "I'm getting noise on channels 200-250 again, what worked last time?"
+
+Step 1: Embed query → 768-dim vector via nomic-embed-text
+Step 2: pgvector cosine similarity search (top 5):
+   → [0.94] "2026-01-15: Noise on ch200-250 resolved by adjusting BP_OTA 1.2V→1.5V"
+   → [0.89] "2025-12-20: Ch200-260 60Hz artifact, fixed with notch filter + re-grounding"
+   → [0.85] "2026-02-01: Intermittent noise ch200-250, loose PCB connector"
+
+Step 3: LLM generates grounded answer:
+   "Based on previous sessions, noise on channels 200-250 has been resolved three ways:
+    1. Most recently (Jan 15): Adjusting BP_OTA from 1.2V to 1.5V — most effective
+    2. Dec 20: 60 Hz line noise removed with notch filter + ground check
+    3. Feb 1: Loose PCB connector caused intermittent noise
+    Shall I adjust BP_OTA to 1.5V?"
+```
+
+#### Ollama GPU Configuration (RTX 5090)
+
+| Model | Purpose | VRAM Usage | Concurrent |
+|-------|---------|------------|------------|
+| `deepseek-r1:7b` | Chat, reasoning, tool calling | ~6 GB | Yes |
+| `nomic-embed-text` | RAG vector embeddings | ~0.5 GB | Yes |
+| **Total** | | **~6.5 GB** | RTX 5090 has 32 GB — plenty of headroom |
+
+#### Agent 8: MCP Orchestrator (Django)
 **Port:** 8085
 **Responsibility:** Central coordination, user management, experiment management
 **MCP Server Role:**
@@ -497,11 +786,18 @@ frontend/
 │   │   │   ├── ComparisonView.tsx         -- Compare recordings side-by-side
 │   │   │   └── ReportGenerator.tsx        -- Auto-generate PDF reports
 │   │   │
+│   │   ├── chat/
+│   │   │   ├── ChatPanel.tsx              -- Collapsible sidebar chat with LLM
+│   │   │   ├── ChatMessage.tsx            -- Single message component
+│   │   │   ├── ToolCallDisplay.tsx        -- Shows MCP tool calls inline
+│   │   │   └── SuggestedActions.tsx       -- Quick action chips from LLM
+│   │   │
 │   │   ├── settings/
 │   │   │   ├── SettingsPage.tsx           -- System settings
 │   │   │   ├── PresetManager.tsx          -- Create/edit/apply config presets
 │   │   │   ├── UserManagement.tsx         -- User RBAC management
-│   │   │   └── AgentMonitor.tsx           -- Agent health/status monitor
+│   │   │   ├── AgentMonitor.tsx           -- Agent health/status monitor
+│   │   │   └── LLMSettings.tsx            -- LLM model config, RAG settings
 │   │   │
 │   │   └── common/
 │   │       ├── WebGLRenderer.ts           -- Shared WebGL rendering utilities
@@ -514,7 +810,8 @@ frontend/
 │   │   ├── useDataStream.ts              -- Real-time data stream hook
 │   │   ├── useSpikeEvents.ts             -- Spike event subscription
 │   │   ├── useRecording.ts               -- Recording state management
-│   │   └── useAgentStatus.ts             -- Agent health monitoring
+│   │   ├── useAgentStatus.ts             -- Agent health monitoring
+│   │   └── useChat.ts                    -- LLM chat hook (send/receive/stream)
 │   │
 │   ├── services/
 │   │   ├── api.ts                         -- REST API client (axios)
@@ -690,9 +987,31 @@ backend/
 │   │   ├── anomaly_detector.py
 │   │   └── report_generator.py
 │   │
-│   └── notification/      -- Notification Agent
-│       ├── agent.py
-│       └── channels.py
+│   ├── notification/      -- Notification Agent
+│   │   ├── agent.py
+│   │   └── channels.py
+│   │
+│   └── llm/               -- LLM Agent (LangGraph)
+│       ├── agent.py           -- FastAPI service wrapping LangGraph
+│       ├── graph.py           -- LangGraph StateGraph definition
+│       ├── nodes/
+│       │   ├── router.py      -- Intent classification node
+│       │   ├── tool_caller.py -- MCP tool invocation node
+│       │   ├── rag_query.py   -- RAG retrieval node
+│       │   ├── responder.py   -- Response generation node
+│       │   └── memory.py      -- Memory read/write node
+│       ├── memory/
+│       │   ├── short_term.py  -- Session state management
+│       │   ├── long_term.py   -- pgvector RAG store
+│       │   └── procedural.py  -- User preference learning
+│       ├── rag/
+│       │   ├── embedder.py    -- Ollama embedding client
+│       │   ├── indexer.py     -- Document chunking + indexing
+│       │   ├── retriever.py   -- pgvector similarity search
+│       │   └── pipeline.py    -- End-to-end RAG pipeline
+│       └── tools/
+│           ├── mcp_bridge.py  -- Bridge LangGraph tools ↔ MCP tools
+│           └── sql_generator.py -- Natural language → SQL
 │
 ├── mcp/                   -- MCP Protocol Implementation
 │   ├── server.py          -- MCP Server
@@ -952,6 +1271,49 @@ services:
       - redis
       - django
 
+  # ============ LLM AGENT (LangGraph) ============
+  agent-llm:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.agent
+    container_name: neural-agent-llm
+    ports:
+      - "8094:8094"
+    environment:
+      - AGENT_NAME=llm
+      - AGENT_PORT=8094
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://neural_admin:${DB_PASSWORD}@postgres:5432/neural_interface
+      - MCP_SERVER_URL=http://django:8085/mcp
+      - OLLAMA_BASE_URL=http://host.docker.internal:12434
+      - OLLAMA_CHAT_MODEL=deepseek-r1:7b
+      - OLLAMA_EMBED_MODEL=nomic-embed-text
+      - LANGFUSE_HOST=http://langfuse:3100
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Access host Ollama from container
+    depends_on:
+      - redis
+      - django
+      - postgres
+      - langfuse
+
+  # ============ LANGFUSE (LLM Observability) ============
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: neural-langfuse
+    ports:
+      - "8095:3000"
+    environment:
+      - DATABASE_URL=postgresql://neural_admin:${DB_PASSWORD}@postgres:5432/langfuse
+      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=http://172.168.1.95:8095
+      - SALT=${LANGFUSE_SALT}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:
   redis_data:
@@ -1111,15 +1473,18 @@ volumes:
 8. Environment configuration (.env files)
 9. Basic health check endpoints
 
-### Phase 2: Agent Framework & MCP/A2A
-**Scope:** Agent base class, MCP server, A2A bus, agent registration
+### Phase 2: Agent Framework & MCP/A2A + LLM Foundation
+**Scope:** Agent base class, MCP server, A2A bus, agent registration, LangGraph setup
 
 1. Base agent class with health check, registration, lifecycle
 2. MCP server implementation in Django
-3. A2A message bus using Redis Streams
+3. A2A message bus using Redis Streams (Google A2A SDK)
 4. Agent registry and discovery
 5. Tool registration framework
 6. Resource subscription framework
+7. LangGraph StateGraph skeleton with Ollama integration
+8. LangFuse observability setup
+9. pgvector extension + RAG schema migration
 
 ### Phase 3: Core Agents — Data Acquisition & Hardware Control
 **Scope:** Port existing CNEAv5.py and SerialThread.py logic into agents
@@ -1162,15 +1527,20 @@ volumes:
 6. FFT/spectrogram display
 7. Telemetry dashboard
 
-### Phase 7: AI/ML Agent & Advanced Features
-**Scope:** Intelligent analysis, experiment management
+### Phase 7: LLM Agent, RAG, AI/ML & Advanced Features
+**Scope:** LLM conversational control, RAG knowledge base, intelligent analysis, experiment management
 
-1. AI/ML Agent with spike sorting
-2. Anomaly detection
-3. Automated parameter optimization suggestions
-4. Experiment management (wizard, templates, scheduling)
-5. Recording browser and playback
-6. Auto-generated reports
+1. LLM Agent (LangGraph) with full tool-calling to all agents
+2. RAG pipeline: document indexing, embedding (nomic-embed-text), pgvector retrieval
+3. Short-term memory (LangGraph checkpointer with PostgreSQL)
+4. Long-term memory: semantic (pgvector), episodic (DB), procedural (preferences)
+5. Chat panel in frontend with streaming responses + tool call display
+6. AI/ML Agent with spike sorting
+7. Anomaly detection with LLM-powered explanations
+8. Automated parameter optimization with RAG-backed suggestions
+9. Experiment management (wizard, templates, scheduling)
+10. Recording browser and playback
+11. Auto-generated experiment reports (LLM + data)
 
 ### Phase 8: Collaboration, Notifications & Polish
 **Scope:** Multi-user, alerts, themes, final polish
@@ -1210,8 +1580,18 @@ volumes:
 | | SciPy | 1.12+ | Signal processing |
 | | PyTables | 3.9+ | HDF5 I/O |
 | | scikit-learn | 1.4+ | ML algorithms |
+| **LLM/Agentic** | LangGraph | 0.2+ | Stateful multi-agent workflows |
+| | LangChain Core | 0.3+ | LLM abstractions, tool bindings |
+| | langchain-ollama | 0.2+ | Ollama LLM integration |
+| | LangFuse | 2.0+ | LLM observability (self-hosted) |
+| | Google A2A SDK | 0.1+ | Agent-to-Agent protocol |
+| | MCP Python SDK | 1.0+ | Model Context Protocol |
+| **LLM** | Ollama | latest | LLM inference server |
+| | DeepSeek-R1:7b | - | Chat, reasoning, tool calling |
+| | nomic-embed-text | - | RAG vector embeddings (768d) |
 | **Database** | PostgreSQL | 16 | Relational data |
 | | TimescaleDB | 2.14+ | Time-series extension |
+| | pgvector | 0.7+ | Vector similarity search (RAG) |
 | **Messaging** | Redis | 7+ | Pub/sub, streams, cache |
 | **Infrastructure** | Docker | 24+ | Containerization |
 | | Docker Compose | 2+ | Multi-container orchestration |
@@ -1252,6 +1632,19 @@ AGENT_NOTIFICATION_PORT=8093
 
 # MCP
 MCP_SERVER_PORT=8087
+
+# LLM (Ollama — existing on host)
+OLLAMA_BASE_URL=http://172.168.1.95:12434
+OLLAMA_CHAT_MODEL=deepseek-r1:7b
+OLLAMA_EMBED_MODEL=nomic-embed-text
+LLM_AGENT_PORT=8094
+
+# LangFuse (LLM Observability)
+LANGFUSE_PORT=8095
+LANGFUSE_PUBLIC_KEY=pk-lf-xxxx
+LANGFUSE_SECRET_KEY=sk-lf-xxxx
+LANGFUSE_NEXTAUTH_SECRET=your-nextauth-secret
+LANGFUSE_SALT=your-salt-here
 
 # Host IP
 HOST_IP=172.168.1.95
@@ -1321,7 +1714,14 @@ capstone-project1/
 │   ├── manage.py
 │   ├── config/                 -- Django settings
 │   ├── apps/                   -- Django apps
-│   ├── agents/                 -- Agent microservices
+│   ├── agents/                 -- Agent microservices (7 agents)
+│   │   ├── llm/               -- LangGraph + RAG + Memory
+│   │   ├── data_acquisition/
+│   │   ├── signal_processing/
+│   │   ├── hardware_control/
+│   │   ├── storage/
+│   │   ├── ai_ml/
+│   │   └── notification/
 │   ├── mcp/                    -- MCP protocol implementation
 │   └── channels/               -- Django Channels consumers
 │
@@ -1344,4 +1744,13 @@ capstone-project1/
 
 ---
 
-This plan transforms the CNEAv5 desktop application into a professional-grade, web-based, multi-agent neural interfacing platform while preserving every existing feature and adding significant business value through AI-assisted analysis, multi-user collaboration, experiment management, and advanced real-time visualization.
+This plan transforms the CNEAv5 desktop application into a professional-grade, web-based, multi-agent neural interfacing platform while preserving every existing feature and adding significant business value through:
+
+- **LLM-powered conversational control** (DeepSeek-R1:7b via Ollama on RTX 5090) — natural language system operation
+- **RAG-based institutional memory** (pgvector + nomic-embed-text) — system learns from every experiment
+- **LangGraph stateful workflows** — intelligent multi-step reasoning with MCP tool calling
+- **LangFuse observability** — full tracing of all LLM interactions
+- **Multi-agent architecture** (8 agents via MCP + A2A) — modular, scalable, fault-tolerant
+- **Advanced real-time visualization** (WebGL, 60 FPS, 64+ channels)
+- **Multi-user collaboration** with RBAC
+- **Experiment management** with scheduling, templates, and auto-generated reports
