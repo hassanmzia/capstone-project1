@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   FlaskConical,
@@ -107,7 +107,7 @@ function statusBadge(status: string) {
     draft: "bg-neural-accent-amber/20 text-neural-accent-amber",
     archived: "bg-neural-text-muted/20 text-neural-text-muted",
   };
-  const icons: Record<string, JSX.Element> = {
+  const icons: Record<string, ReactNode> = {
     active: <CheckCircle2 className="w-3.5 h-3.5" />,
     completed: <Archive className="w-3.5 h-3.5" />,
     draft: <FileText className="w-3.5 h-3.5" />,
