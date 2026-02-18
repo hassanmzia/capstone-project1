@@ -63,6 +63,7 @@ export function useSpikeEvents(config: UseSpikeEventsConfig = {}): UseSpikeEvent
   const recentCountsRef = useRef(new Float32Array(totalSites)); // counts in current window
   const latestSpikesRef = useRef<SpikeEvent[]>([]);
   const totalSpikesRef = useRef(0);
+  const hasReceivedDataRef = useRef(false);
 
   // React state for consumer re-renders (updated at throttled interval)
   const [spikeCounts, setSpikeCounts] = useState(() => new Float32Array(totalSites));
@@ -78,6 +79,7 @@ export function useSpikeEvents(config: UseSpikeEventsConfig = {}): UseSpikeEvent
       const data = rawData as Record<string, unknown>;
 
       if (data.type === "spike" || data.type === "spike_event") {
+        hasReceivedDataRef.current = true;
         const siteIndex = (data.siteIndex ?? data.electrodeId ?? 0) as number;
         if (siteIndex >= 0 && siteIndex < totalSites) {
           spikeCountsRef.current[siteIndex] += 1;
@@ -101,6 +103,7 @@ export function useSpikeEvents(config: UseSpikeEventsConfig = {}): UseSpikeEvent
 
       // Batch spike events
       if (data.type === "spike_batch" && Array.isArray(data.events)) {
+        hasReceivedDataRef.current = true;
         const events = data.events as Array<Record<string, unknown>>;
         for (const evt of events) {
           const siteIndex = (evt.siteIndex ?? evt.electrodeId ?? 0) as number;
@@ -129,68 +132,82 @@ export function useSpikeEvents(config: UseSpikeEventsConfig = {}): UseSpikeEvent
     setIsConnected(wsConnected);
   }, [wsConnected]);
 
-  // ---------- Mock spike generation when no backend ----------
+  // ---------- Mock spike generation when no backend / no data ----------
   const mockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mockStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const startMockSpikes = useCallback(() => {
+    if (mockTimerRef.current) return;
+
+    setIsConnected(true); // Indicate demo mode active
+
+    // Generate spikes at ~200/sec across ~150 active sites
+    mockTimerRef.current = setInterval(() => {
+      const spikesThisTick = 15 + Math.floor(Math.random() * 10); // 15-24 per 100ms
+      for (let i = 0; i < spikesThisTick; i++) {
+        const cluster = Math.floor(Math.random() * 6);
+        const clusterCenter = [512, 1024, 1800, 2400, 3000, 3600][cluster];
+        const offset = Math.floor((Math.random() - 0.5) * 200);
+        const siteIndex = Math.max(0, Math.min(totalSites - 1, clusterCenter + offset));
+
+        spikeCountsRef.current[siteIndex] += 1;
+        recentCountsRef.current[siteIndex] += 1;
+        totalSpikesRef.current += 1;
+
+        if (i < 3) {
+          latestSpikesRef.current.push({
+            siteIndex,
+            channelId: siteIndex % 64,
+            timestamp: Date.now(),
+            amplitude: 100 + Math.random() * 150,
+          });
+          if (latestSpikesRef.current.length > 100) {
+            latestSpikesRef.current = latestSpikesRef.current.slice(-100);
+          }
+        }
+      }
+    }, 100);
+  }, [totalSites]);
+
+  const stopMockSpikes = useCallback(() => {
+    if (mockTimerRef.current) {
+      clearInterval(mockTimerRef.current);
+      mockTimerRef.current = null;
+    }
+    if (mockStartTimerRef.current) {
+      clearTimeout(mockStartTimerRef.current);
+      mockStartTimerRef.current = null;
+    }
+  }, []);
+
+  // Fallback (a): no connection after 3 seconds
   useEffect(() => {
     if (wsConnected) {
-      if (mockTimerRef.current) {
-        clearInterval(mockTimerRef.current);
-        mockTimerRef.current = null;
-      }
-      if (mockStartTimerRef.current) {
-        clearTimeout(mockStartTimerRef.current);
-        mockStartTimerRef.current = null;
-      }
+      stopMockSpikes();
       return;
     }
 
     mockStartTimerRef.current = setTimeout(() => {
-      if (mockTimerRef.current) return;
-
-      setIsConnected(true); // Indicate demo mode active
-
-      // Generate spikes at ~200/sec across ~150 active sites
-      mockTimerRef.current = setInterval(() => {
-        const spikesThisTick = 15 + Math.floor(Math.random() * 10); // 15-24 per 100ms
-        for (let i = 0; i < spikesThisTick; i++) {
-          // Cluster spikes around a few "hot" regions
-          const cluster = Math.floor(Math.random() * 6);
-          const clusterCenter = [512, 1024, 1800, 2400, 3000, 3600][cluster];
-          const offset = Math.floor((Math.random() - 0.5) * 200);
-          const siteIndex = Math.max(0, Math.min(totalSites - 1, clusterCenter + offset));
-
-          spikeCountsRef.current[siteIndex] += 1;
-          recentCountsRef.current[siteIndex] += 1;
-          totalSpikesRef.current += 1;
-
-          if (i < 3) { // Only store a few per tick in the latest list
-            latestSpikesRef.current.push({
-              siteIndex,
-              channelId: siteIndex % 64,
-              timestamp: Date.now(),
-              amplitude: 100 + Math.random() * 150,
-            });
-            if (latestSpikesRef.current.length > 100) {
-              latestSpikesRef.current = latestSpikesRef.current.slice(-100);
-            }
-          }
-        }
-      }, 100);
+      startMockSpikes();
     }, 3000);
 
-    return () => {
-      if (mockTimerRef.current) {
-        clearInterval(mockTimerRef.current);
-        mockTimerRef.current = null;
+    return stopMockSpikes;
+  }, [wsConnected, startMockSpikes, stopMockSpikes]);
+
+  // Fallback (b): connected but no spike data received after 5 seconds
+  useEffect(() => {
+    if (!wsConnected) return;
+
+    hasReceivedDataRef.current = false;
+
+    const noDataTimer = setTimeout(() => {
+      if (!hasReceivedDataRef.current && !mockTimerRef.current) {
+        startMockSpikes();
       }
-      if (mockStartTimerRef.current) {
-        clearTimeout(mockStartTimerRef.current);
-        mockStartTimerRef.current = null;
-      }
-    };
-  }, [wsConnected, totalSites]);
+    }, 5000);
+
+    return () => clearTimeout(noDataTimer);
+  }, [wsConnected, startMockSpikes]);
 
   // Periodic update: decay rates and push state
   useEffect(() => {
