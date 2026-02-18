@@ -16,8 +16,10 @@ import {
   X,
   Cpu,
   Activity,
+  BarChart3,
 } from "lucide-react";
 import LiveRecordingDashboard, { type RecordingStats, type EventMarker } from "./LiveRecordingDashboard";
+import { useRecordingSession } from "@/contexts/RecordingSessionContext";
 
 export interface MockRecording {
   id: string;
@@ -98,6 +100,7 @@ type RecordingPhase = "idle" | "setup" | "recording" | "paused";
 
 export default function RecordingBrowserPage() {
   const navigate = useNavigate();
+  const { startSession, updateSession, endSession, startPlayback } = useRecordingSession();
   const [search, setSearch] = useState("");
   const [recordings, setRecordings] = useState<MockRecording[]>(loadRecordings);
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -134,6 +137,25 @@ export default function RecordingBrowserPage() {
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
+  }, []);
+
+  // Restore shared context if there's a persisted active session on mount
+  useEffect(() => {
+    const s = restored.current;
+    if (s && (s.phase === "recording" || s.phase === "paused")) {
+      const exp = availableExperiments.find((e) => e.id === s.experiment);
+      startSession({
+        name: s.name,
+        experimentName: exp?.name || "Unknown Experiment",
+        channels: parseInt(s.channels) || 64,
+        sampleRate: parseInt(s.sampleRate) || 30000,
+        format: s.format,
+        startedAt: s.startedAt,
+        isPaused: s.phase === "paused",
+      });
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Persist recordings whenever they change (debounced)
@@ -223,6 +245,7 @@ export default function RecordingBrowserPage() {
 
   const handleBeginRecording = () => {
     const now = Date.now();
+    const exp = availableExperiments.find((e) => e.id === setupExperiment);
     setElapsedSec(0);
     startTimeRef.current = now;
     pausedElapsedRef.current = 0;
@@ -236,6 +259,16 @@ export default function RecordingBrowserPage() {
       sampleRate: setupSampleRate,
       startedAt: now,
       pausedElapsed: 0,
+    });
+    // Publish to shared context so VisualizationPage can consume live data
+    startSession({
+      name: setupName || defaultName,
+      experimentName: exp?.name || "Unknown Experiment",
+      channels: parseInt(setupChannels) || 64,
+      sampleRate: parseInt(setupSampleRate) || 30000,
+      format: setupFormat,
+      startedAt: now,
+      isPaused: false,
     });
   };
 
@@ -256,7 +289,8 @@ export default function RecordingBrowserPage() {
       startedAt: 0,
       pausedElapsed: total,
     });
-  }, [setupName, setupExperiment, setupChannels, setupFormat, setupSampleRate]);
+    updateSession({ isPaused: true });
+  }, [setupName, setupExperiment, setupChannels, setupFormat, setupSampleRate, updateSession]);
 
   const handleResume = useCallback(() => {
     const now = Date.now();
@@ -272,7 +306,8 @@ export default function RecordingBrowserPage() {
       startedAt: now,
       pausedElapsed: pausedElapsedRef.current,
     });
-  }, [setupName, setupExperiment, setupChannels, setupFormat, setupSampleRate]);
+    updateSession({ isPaused: false });
+  }, [setupName, setupExperiment, setupChannels, setupFormat, setupSampleRate, updateSession]);
 
   const handleStopRecording = useCallback((stats: RecordingStats, markers: EventMarker[]) => {
     if (timerRef.current) {
@@ -311,7 +346,8 @@ export default function RecordingBrowserPage() {
     setPhase("idle");
     pausedElapsedRef.current = 0;
     saveActiveSession(null);
-  }, [setupExperiment, setupChannels, setupFormat, setupSampleRate, setupName, defaultName, elapsedSec]);
+    endSession();
+  }, [setupExperiment, setupChannels, setupFormat, setupSampleRate, setupName, defaultName, elapsedSec, endSession]);
 
   const handleCancelSetup = () => {
     if (timerRef.current) {
@@ -321,7 +357,22 @@ export default function RecordingBrowserPage() {
     setPhase("idle");
     pausedElapsedRef.current = 0;
     saveActiveSession(null);
+    endSession();
   };
+
+  const handleAnalyzeInVisualizer = useCallback((rec: MockRecording) => {
+    const sr = rec.sampleRate ? parseInt(rec.sampleRate) : 30000;
+    startPlayback({
+      recordingId: rec.id,
+      name: rec.name,
+      experimentName: rec.experimentName,
+      channels: rec.channels,
+      sampleRate: sr,
+      duration: rec.duration,
+      spikeCount: rec.spikeCount,
+    });
+    navigate("/visualization");
+  }, [startPlayback, navigate]);
 
   const handleDelete = useCallback((id: string) => {
     setRecordings((prev) => prev.filter((r) => r.id !== id));
@@ -604,6 +655,15 @@ export default function RecordingBrowserPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-1">
+                      {rec.status === "completed" && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleAnalyzeInVisualizer(rec); }}
+                          className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-cyan neural-transition"
+                          title="Analyze in Visualizer"
+                        >
+                          <BarChart3 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button
                         onClick={(e) => { e.stopPropagation(); navigate(`/recordings/${rec.id}`); }}
                         className="p-1 rounded hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-green neural-transition"

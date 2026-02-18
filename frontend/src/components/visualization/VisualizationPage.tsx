@@ -39,6 +39,7 @@ import RasterDisplay from "./RasterDisplay";
 // Shared data contexts
 import { NeuralDataProvider } from "@/contexts/NeuralDataContext";
 import { SpikeEventsProvider } from "@/contexts/SpikeEventsContext";
+import { useRecordingSession } from "@/contexts/RecordingSessionContext";
 
 // Icons
 import {
@@ -56,6 +57,9 @@ import {
   Radio,
   Thermometer,
   LayoutGrid,
+  Circle,
+  XCircle,
+  Disc,
 } from "lucide-react";
 
 type RightPanelTab = "heatmap" | "electrode";
@@ -71,6 +75,13 @@ const displayModes: { mode: DisplayMode; label: string; icon: typeof Activity }[
 export default function VisualizationPage() {
   const dispatch = useDispatch();
   const viz = useSelector((state: RootState) => state.visualization);
+  const { mode, activeSession, playbackSession, endPlayback } = useRecordingSession();
+
+  // Determine channel count from data source
+  const sourceChannelCount =
+    mode === "live" && activeSession ? activeSession.channels :
+    mode === "playback" && playbackSession ? playbackSession.channels :
+    64;
 
   // Panel states
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>("heatmap");
@@ -90,8 +101,8 @@ export default function VisualizationPage() {
 
   // Quick channel select helpers
   const selectAllChannels = useCallback(() => {
-    dispatch(setSelectedChannels(Array.from({ length: 64 }, (_, i) => i)));
-  }, [dispatch]);
+    dispatch(setSelectedChannels(Array.from({ length: sourceChannelCount }, (_, i) => i)));
+  }, [dispatch, sourceChannelCount]);
 
   const clearAllChannels = useCallback(() => {
     dispatch(setSelectedChannels([]));
@@ -134,6 +145,41 @@ export default function VisualizationPage() {
               <span className="hidden lg:inline">{label}</span>
             </button>
           ))}
+        </div>
+
+        {/* Data source indicator */}
+        <div className="flex items-center gap-2">
+          {mode === "live" && activeSession && (
+            <div className="flex items-center gap-1.5 bg-neural-accent-red/15 border border-neural-accent-red/30 rounded-lg px-2.5 py-1">
+              <Circle className="w-2.5 h-2.5 text-neural-accent-red animate-pulse fill-current" />
+              <span className="text-xs font-semibold text-neural-accent-red tracking-wide">LIVE</span>
+              <span className="text-[10px] text-neural-accent-red/70 font-mono">{activeSession.name}</span>
+              {activeSession.isPaused && (
+                <span className="text-[10px] text-neural-accent-amber ml-1">(PAUSED)</span>
+              )}
+            </div>
+          )}
+          {mode === "playback" && playbackSession && (
+            <div className="flex items-center gap-1.5 bg-neural-accent-purple/15 border border-neural-accent-purple/30 rounded-lg px-2.5 py-1">
+              <Disc className="w-3 h-3 text-neural-accent-purple" />
+              <span className="text-xs font-semibold text-neural-accent-purple tracking-wide">PLAYBACK</span>
+              <span className="text-[10px] text-neural-accent-purple/70 font-mono">{playbackSession.name}</span>
+              <span className="text-[10px] text-neural-text-muted">({playbackSession.duration})</span>
+              <button
+                onClick={() => endPlayback()}
+                className="ml-1 p-0.5 rounded hover:bg-neural-accent-purple/20 text-neural-accent-purple/60 hover:text-neural-accent-purple neural-transition"
+                title="Exit playback"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+          {mode === "simulation" && (
+            <div className="flex items-center gap-1.5 bg-neural-accent-cyan/10 border border-neural-accent-cyan/20 rounded-lg px-2.5 py-1">
+              <Activity className="w-3 h-3 text-neural-accent-cyan" />
+              <span className="text-xs font-medium text-neural-accent-cyan">SIMULATION</span>
+            </div>
+          )}
         </div>
 
         {/* Playback + visualization controls */}
@@ -247,7 +293,7 @@ export default function VisualizationPage() {
       </div>
 
       {/* ─── Main Grid Layout ─── */}
-      <NeuralDataProvider channelCount={64} targetFps={60}>
+      <NeuralDataProvider channelCount={sourceChannelCount} targetFps={60}>
       <SpikeEventsProvider totalSites={4096}>
       <div
         className="flex-1 min-h-0 grid gap-1 p-1"
@@ -281,7 +327,7 @@ export default function VisualizationPage() {
 
             <div className="flex-1 overflow-y-auto px-1 py-1">
               <div className="space-y-px">
-                {Array.from({ length: 64 }, (_, i) => {
+                {Array.from({ length: sourceChannelCount }, (_, i) => {
                   const isSelected = viz.selectedChannels.includes(i);
                   return (
                     <button
@@ -306,7 +352,7 @@ export default function VisualizationPage() {
             </div>
 
             <div className="px-2.5 py-1.5 border-t border-neural-border text-[10px] text-neural-text-muted shrink-0">
-              {viz.selectedChannels.length} / 64 selected
+              {viz.selectedChannels.length} / {sourceChannelCount} selected
             </div>
           </div>
         )}
@@ -361,7 +407,7 @@ export default function VisualizationPage() {
                   className="h-full"
                   selectedChannels={viz.selectedChannels}
                   onChannelSelect={handleElectrodeSelect}
-                  displaySize={64}
+                  displaySize={sourceChannelCount}
                 />
               )}
             </div>
