@@ -171,10 +171,14 @@ function handleWsConnection(
     });
 
     // Forward messages from Django Channels to the client
-    upstreamWs.on('message', (data: Buffer | string) => {
+    // NOTE: ws v8+ delivers all data as Buffer regardless of frame type.
+    // We must convert to string so the receiving end gets a text frame,
+    // otherwise Django Channels / browser will treat it as binary and ignore it.
+    upstreamWs.on('message', (data: Buffer | string, isBinary: boolean) => {
       if (clientWs.readyState === WebSocket.OPEN) {
         try {
-          clientWs.send(data);
+          const message = isBinary ? data : data.toString();
+          clientWs.send(message);
         } catch (err) {
           console.error(
             `[WebSocket] Error sending to client on "${channel}":`,
@@ -192,7 +196,7 @@ function handleWsConnection(
       // Flush any messages queued while upstream was connecting
       for (const msg of pendingMessages) {
         try {
-          upstreamWs!.send(msg);
+          upstreamWs!.send(typeof msg === 'string' ? msg : msg.toString());
         } catch (err) {
           console.error(
             `[WebSocket] Error flushing queued message on "${channel}":`,
@@ -232,10 +236,12 @@ function handleWsConnection(
   }
 
   // Forward messages from the client to Django Channels
-  clientWs.on('message', (data: Buffer | string) => {
+  clientWs.on('message', (data: Buffer | string, isBinary: boolean) => {
+    // Convert Buffer to string for text frames so Django receives text_data
+    const message = isBinary ? data : data.toString();
     if (upstreamWs && upstreamReady) {
       try {
-        upstreamWs.send(data);
+        upstreamWs.send(message);
       } catch (err) {
         console.error(
           `[WebSocket] Error forwarding message to upstream on "${channel}":`,
@@ -247,7 +253,7 @@ function handleWsConnection(
       console.log(
         `[WebSocket] Queuing message on "${channel}" (upstream not ready)`
       );
-      pendingMessages.push(data);
+      pendingMessages.push(message);
     }
   });
 
