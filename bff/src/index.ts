@@ -152,6 +152,8 @@ function handleWsConnection(
   // Create upstream connection to Django Channels
   const djangoWsUrl = `${DJANGO_WS_URL}${djangoPath}`;
   let upstreamWs: WebSocket | null = null;
+  let upstreamReady = false;
+  const pendingMessages: (Buffer | string)[] = [];
 
   try {
     // Forward auth headers to Django Channels
@@ -186,6 +188,19 @@ function handleWsConnection(
       console.log(
         `[WebSocket] Upstream connection established for "${channel}"`
       );
+      upstreamReady = true;
+      // Flush any messages queued while upstream was connecting
+      for (const msg of pendingMessages) {
+        try {
+          upstreamWs!.send(msg);
+        } catch (err) {
+          console.error(
+            `[WebSocket] Error flushing queued message on "${channel}":`,
+            err
+          );
+        }
+      }
+      pendingMessages.length = 0;
     });
 
     upstreamWs.on('error', (err: Error) => {
@@ -201,6 +216,7 @@ function handleWsConnection(
       console.log(
         `[WebSocket] Upstream closed for "${channel}" (code: ${code}, reason: ${reason.toString()})`
       );
+      upstreamReady = false;
       if (clientWs.readyState === WebSocket.OPEN) {
         clientWs.close(code, reason.toString());
       }
@@ -217,7 +233,7 @@ function handleWsConnection(
 
   // Forward messages from the client to Django Channels
   clientWs.on('message', (data: Buffer | string) => {
-    if (upstreamWs && upstreamWs.readyState === WebSocket.OPEN) {
+    if (upstreamWs && upstreamReady) {
       try {
         upstreamWs.send(data);
       } catch (err) {
@@ -226,6 +242,12 @@ function handleWsConnection(
           err
         );
       }
+    } else {
+      // Queue messages while upstream is still connecting
+      console.log(
+        `[WebSocket] Queuing message on "${channel}" (upstream not ready)`
+      );
+      pendingMessages.push(data);
     }
   });
 

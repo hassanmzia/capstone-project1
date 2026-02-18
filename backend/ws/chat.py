@@ -75,7 +75,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             new_group = f"{CHAT_GROUP_PREFIX}{self.session_id}"
             await self.channel_layer.group_add(new_group, self.channel_name)
 
-        logger.debug("Chat WS received (%s): %.80s…", msg_type, content)
+        logger.info(
+            "Chat message received (model=%s): %.120s",
+            model or "default", content,
+        )
 
         await self._stream_from_agent(content, session_id, model)
 
@@ -94,6 +97,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if model:
             request_body["model"] = model
 
+        logger.info("Forwarding to agent-llm: %s", chat_url)
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0)) as client:
                 async with client.stream("POST", chat_url, json=request_body) as response:
@@ -186,6 +190,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 )
             )
 
+        logger.info("Chat stream completed, sending chat.end")
         await self.send(text_data=json.dumps({"type": "chat.end"}))
 
     # ── Group message handlers ───────────────────────────────────────────
