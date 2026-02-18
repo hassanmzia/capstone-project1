@@ -13,6 +13,7 @@ with a unified interface.
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
@@ -27,6 +28,7 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:12434")
 OLLAMA_CHAT_MODEL = os.getenv("OLLAMA_CHAT_MODEL", "deepseek-r1:7b")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+OLLAMA_MAX_TOKENS = int(os.getenv("OLLAMA_MAX_TOKENS", "2048"))
 
 
 # ---------------------------------------------------------------------------
@@ -162,6 +164,11 @@ async def chat(
 # Ollama
 # ---------------------------------------------------------------------------
 
+def _strip_think_tags(text: str) -> str:
+    """Remove DeepSeek-R1 <think>…</think> reasoning blocks from output."""
+    return re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
+
+
 async def _stream_ollama(
     messages: List[Dict[str, str]], model: str, temperature: float
 ) -> AsyncGenerator[str, None]:
@@ -170,19 +177,35 @@ async def _stream_ollama(
             async with client.stream(
                 "POST",
                 f"{OLLAMA_BASE_URL}/api/chat",
-                json={"model": model, "messages": messages, "stream": True},
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "stream": True,
+                    "options": {"num_predict": OLLAMA_MAX_TOKENS},
+                },
             ) as response:
                 response.raise_for_status()
+                in_think = False
                 async for line in response.aiter_lines():
                     if not line:
                         continue
                     try:
                         data = json.loads(line)
                         token = data.get("message", {}).get("content", "")
-                        if token:
-                            yield token
                         if data.get("done", False):
                             return
+                        if not token:
+                            continue
+                        # Filter <think> blocks from reasoning models
+                        if "<think>" in token:
+                            in_think = True
+                            continue
+                        if "</think>" in token:
+                            in_think = False
+                            continue
+                        if in_think:
+                            continue
+                        yield token
                     except json.JSONDecodeError:
                         continue
     except httpx.ConnectError:
@@ -199,10 +222,16 @@ async def _chat_ollama(
         async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
             resp = await client.post(
                 f"{OLLAMA_BASE_URL}/api/chat",
-                json={"model": model, "messages": messages, "stream": False},
+                json={
+                    "model": model,
+                    "messages": messages,
+                    "stream": False,
+                    "options": {"num_predict": OLLAMA_MAX_TOKENS},
+                },
             )
             resp.raise_for_status()
-            return resp.json().get("message", {}).get("content", "")
+            raw = resp.json().get("message", {}).get("content", "")
+            return _strip_think_tags(raw)
     except Exception as exc:
         logger.error("Ollama chat error: %s", exc)
         return f"Error communicating with Ollama: {exc}"

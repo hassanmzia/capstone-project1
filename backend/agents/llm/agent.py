@@ -460,6 +460,7 @@ class LLMAgent(BaseAgent):
             })
 
         yield f"data: {json.dumps({'done': True, 'session_id': session_id})}\n\n"
+        yield "data: [DONE]\n\n"
 
     async def _fallback_chat(
         self, state: NeuralAssistantState

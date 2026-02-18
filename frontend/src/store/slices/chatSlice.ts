@@ -82,6 +82,13 @@ const chatSlice = createSlice({
     },
     setStreaming(state, action: PayloadAction<boolean>) {
       state.isStreaming = action.payload;
+      // When streaming ends, clear isStreaming flag on the last assistant message
+      if (!action.payload) {
+        const last = state.messages[state.messages.length - 1];
+        if (last && last.role === "assistant") {
+          last.isStreaming = false;
+        }
+      }
     },
     setSessionId(state, action: PayloadAction<string>) {
       state.sessionId = action.payload;

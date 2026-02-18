@@ -177,6 +177,24 @@ export default function ChatPanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamBufferRef = useRef("");
   const assistantMsgIdRef = useRef<string | null>(null);
+  const streamTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Safety net: force-reset streaming after 90s if chat.end never arrives
+  useEffect(() => {
+    if (isStreaming) {
+      streamTimeoutRef.current = setTimeout(() => {
+        dispatch(setStreaming(false));
+        assistantMsgIdRef.current = null;
+        streamBufferRef.current = "";
+      }, 90_000);
+    } else if (streamTimeoutRef.current) {
+      clearTimeout(streamTimeoutRef.current);
+      streamTimeoutRef.current = null;
+    }
+    return () => {
+      if (streamTimeoutRef.current) clearTimeout(streamTimeoutRef.current);
+    };
+  }, [isStreaming, dispatch]);
 
   // Ensure we have a session ID
   useEffect(() => {
