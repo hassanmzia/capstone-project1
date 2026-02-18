@@ -20,12 +20,42 @@ const analysisTypes = [
   { name: "Spectral Analysis", description: "Power spectral density and coherence analysis", icon: TrendingUp, color: "text-neural-accent-rose" },
 ];
 
-const availableRecordings = [
+interface AnalysisRecording {
+  id: string;
+  name: string;
+  experiment: string;
+  channels: number;
+  status: string;
+}
+
+const seedRecordings: AnalysisRecording[] = [
   { id: "rec-042", name: "session_042", experiment: "Hippocampal CA1 Place Cell Study", channels: 64, status: "completed" },
   { id: "rec-041", name: "session_041", experiment: "Hippocampal CA1 Place Cell Study", channels: 64, status: "completed" },
   { id: "rec-040", name: "session_040", experiment: "Cortical Spike Timing Analysis", channels: 32, status: "completed" },
   { id: "rec-038", name: "session_038", experiment: "Retinal Ganglion Response Mapping", channels: 128, status: "completed" },
 ];
+
+/** Load completed recordings from localStorage and merge with seeds */
+function loadAvailableRecordings(): AnalysisRecording[] {
+  const seedIds = new Set(seedRecordings.map((r) => r.id));
+  try {
+    const raw = localStorage.getItem("cnea_recordings");
+    if (raw) {
+      const all = JSON.parse(raw) as { id: string; name: string; experimentName: string; channels: number; status: string }[];
+      const userRecs = all
+        .filter((r) => r.status === "completed" && !seedIds.has(r.id))
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          experiment: r.experimentName,
+          channels: r.channels,
+          status: r.status,
+        }));
+      return [...userRecs, ...seedRecordings];
+    }
+  } catch { /* ignore */ }
+  return seedRecordings;
+}
 
 const parameterTemplates: Record<string, { label: string; defaultValue: string }[]> = {
   "Spike Sorting": [
@@ -69,6 +99,7 @@ export default function NewAnalysisPage() {
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedRecording, setSelectedRecording] = useState<string | null>(null);
   const [params, setParams] = useState<Record<string, string>>({});
+  const [availableRecordings] = useState<AnalysisRecording[]>(loadAvailableRecordings);
 
   const currentParams = selectedType ? parameterTemplates[selectedType] || [] : [];
 

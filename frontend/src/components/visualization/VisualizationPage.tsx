@@ -11,7 +11,7 @@
  * - Tab system to switch between visualization modes
  */
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import type { RootState } from "@/store";
 import {
@@ -60,6 +60,11 @@ import {
   Circle,
   XCircle,
   Disc,
+  SkipBack,
+  SkipForward,
+  Zap,
+  Clock,
+  HardDrive,
 } from "lucide-react";
 
 type RightPanelTab = "heatmap" | "electrode";
@@ -82,6 +87,61 @@ export default function VisualizationPage() {
     mode === "live" && activeSession ? activeSession.channels :
     mode === "playback" && playbackSession ? playbackSession.channels :
     64;
+
+  // Playback state
+  const [playbackElapsed, setPlaybackElapsed] = useState(0);
+  const [playbackPaused, setPlaybackPaused] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const playbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Parse total duration from playback session (format: "MM:SS")
+  const playbackTotalSec = useMemo(() => {
+    if (!playbackSession) return 0;
+    const parts = playbackSession.duration.split(":");
+    return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+  }, [playbackSession]);
+
+  // Reset playback position when session changes
+  useEffect(() => {
+    setPlaybackElapsed(0);
+    setPlaybackPaused(false);
+    setPlaybackSpeed(1);
+  }, [playbackSession?.recordingId]);
+
+  // Playback timer
+  useEffect(() => {
+    if (mode !== "playback" || !playbackSession || playbackPaused) {
+      if (playbackTimerRef.current) {
+        clearInterval(playbackTimerRef.current);
+        playbackTimerRef.current = null;
+      }
+      return;
+    }
+
+    playbackTimerRef.current = setInterval(() => {
+      setPlaybackElapsed((prev) => {
+        const next = prev + playbackSpeed;
+        if (next >= playbackTotalSec) {
+          setPlaybackPaused(true);
+          return playbackTotalSec;
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => {
+      if (playbackTimerRef.current) {
+        clearInterval(playbackTimerRef.current);
+        playbackTimerRef.current = null;
+      }
+    };
+  }, [mode, playbackSession, playbackPaused, playbackSpeed, playbackTotalSec]);
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
 
   // Panel states
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>("heatmap");
@@ -476,6 +536,124 @@ export default function VisualizationPage() {
       </div>
       </SpikeEventsProvider>
       </NeuralDataProvider>
+
+      {/* ─── Playback Progress Bar ─── */}
+      {mode === "playback" && playbackSession && (
+        <div className="bg-neural-surface border-t border-neural-border px-4 py-2 shrink-0">
+          {/* Recording info row */}
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-3 text-[11px] text-neural-text-muted">
+              <span className="flex items-center gap-1">
+                <HardDrive className="w-3 h-3" />
+                <span className="font-mono text-neural-text-secondary">{playbackSession.name}</span>
+              </span>
+              <span>{playbackSession.experimentName}</span>
+              <span className="flex items-center gap-1">
+                <Cpu className="w-3 h-3" />
+                {playbackSession.channels}ch
+              </span>
+              <span className="flex items-center gap-1">
+                <Zap className="w-3 h-3" />
+                {playbackSession.spikeCount.toLocaleString()} spikes
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-neural-text-muted">Speed:</span>
+              {[1, 2, 4, 8].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setPlaybackSpeed(s)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono neural-transition ${
+                    playbackSpeed === s
+                      ? "bg-neural-accent-purple/20 text-neural-accent-purple"
+                      : "text-neural-text-muted hover:text-neural-text-primary"
+                  }`}
+                >
+                  {s}x
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Progress bar + controls */}
+          <div className="flex items-center gap-3">
+            {/* Transport controls */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPlaybackElapsed(0)}
+                className="p-1 rounded hover:bg-neural-surface-alt text-neural-text-muted hover:text-neural-text-primary neural-transition"
+                title="Restart"
+              >
+                <SkipBack className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => {
+                  if (playbackElapsed >= playbackTotalSec) {
+                    setPlaybackElapsed(0);
+                    setPlaybackPaused(false);
+                  } else {
+                    setPlaybackPaused(!playbackPaused);
+                  }
+                }}
+                className={`p-1.5 rounded-lg neural-transition ${
+                  playbackPaused
+                    ? "bg-neural-accent-purple/20 text-neural-accent-purple"
+                    : "bg-neural-accent-green/20 text-neural-accent-green"
+                }`}
+                title={playbackPaused ? (playbackElapsed >= playbackTotalSec ? "Replay" : "Resume") : "Pause"}
+              >
+                {playbackPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={() => setPlaybackElapsed(Math.min(playbackElapsed + 30, playbackTotalSec))}
+                className="p-1 rounded hover:bg-neural-surface-alt text-neural-text-muted hover:text-neural-text-primary neural-transition"
+                title="Skip +30s"
+              >
+                <SkipForward className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Current time */}
+            <span className="text-xs font-mono text-neural-accent-purple w-12 text-right">
+              {formatTime(playbackElapsed)}
+            </span>
+
+            {/* Progress bar */}
+            <div className="flex-1 relative group">
+              <div
+                className="w-full h-2 bg-neural-border rounded-full overflow-hidden cursor-pointer"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                  setPlaybackElapsed(Math.round(pct * playbackTotalSec));
+                }}
+              >
+                <div
+                  className="h-full bg-gradient-to-r from-neural-accent-purple to-neural-accent-cyan rounded-full neural-transition relative"
+                  style={{ width: `${playbackTotalSec > 0 ? (playbackElapsed / playbackTotalSec) * 100 : 0}%` }}
+                >
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 neural-transition" />
+                </div>
+              </div>
+            </div>
+
+            {/* Total time */}
+            <span className="text-xs font-mono text-neural-text-muted w-12">
+              {formatTime(playbackTotalSec)}
+            </span>
+
+            {/* Elapsed indicator */}
+            <div className="flex items-center gap-1 text-[10px] text-neural-text-muted">
+              <Clock className="w-3 h-3" />
+              {playbackElapsed >= playbackTotalSec ? (
+                <span className="text-neural-accent-green">Complete</span>
+              ) : (
+                <span>{Math.round((playbackElapsed / Math.max(playbackTotalSec, 1)) * 100)}%</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
