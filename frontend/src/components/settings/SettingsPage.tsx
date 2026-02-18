@@ -16,6 +16,9 @@ import {
   X,
   Eye,
   EyeOff,
+  Lock,
+  Key,
+  UserCheck,
 } from "lucide-react";
 
 const settingsTabs = [
@@ -143,20 +146,88 @@ function savePresets(presets: Preset[]) {
   localStorage.setItem("cnea_presets", JSON.stringify(presets));
 }
 
-/* ── User shape ── */
+/* ── User / RBAC shapes ── */
+type RoleName = "Admin" | "Researcher" | "Operator" | "Viewer";
+
+type Permission =
+  | "hardware:read" | "hardware:write"
+  | "recording:start" | "recording:stop" | "recording:export"
+  | "analysis:run" | "analysis:configure"
+  | "users:manage"
+  | "settings:edit"
+  | "llm:use";
+
+const ALL_PERMISSIONS: { key: Permission; label: string; group: string }[] = [
+  { key: "hardware:read", label: "View Hardware", group: "Hardware" },
+  { key: "hardware:write", label: "Configure Hardware", group: "Hardware" },
+  { key: "recording:start", label: "Start Recording", group: "Recording" },
+  { key: "recording:stop", label: "Stop Recording", group: "Recording" },
+  { key: "recording:export", label: "Export Data", group: "Recording" },
+  { key: "analysis:run", label: "Run Analysis", group: "Analysis" },
+  { key: "analysis:configure", label: "Configure Pipelines", group: "Analysis" },
+  { key: "users:manage", label: "Manage Users", group: "Admin" },
+  { key: "settings:edit", label: "Edit Settings", group: "Admin" },
+  { key: "llm:use", label: "Use AI Assistant", group: "AI" },
+];
+
+const ROLE_DEFAULTS: Record<RoleName, Permission[]> = {
+  Admin: ALL_PERMISSIONS.map((p) => p.key),
+  Researcher: [
+    "hardware:read", "hardware:write",
+    "recording:start", "recording:stop", "recording:export",
+    "analysis:run", "analysis:configure",
+    "llm:use",
+  ],
+  Operator: [
+    "hardware:read", "hardware:write",
+    "recording:start", "recording:stop",
+    "llm:use",
+  ],
+  Viewer: ["hardware:read", "llm:use"],
+};
+
+const ROLES: RoleName[] = ["Admin", "Researcher", "Operator", "Viewer"];
+
 interface UserEntry {
+  id: string;
   name: string;
-  role: string;
+  role: RoleName;
   email: string;
   lastActive: string;
+  status: "active" | "inactive" | "locked";
+  permissions: Permission[];
+}
+
+interface AuthSettings {
+  method: "jwt" | "oauth2" | "ldap";
+  sessionTimeout: number; // hours
+  mfaEnabled: boolean;
+  maxLoginAttempts: number;
+  lockoutDuration: number; // minutes
+}
+
+const DEFAULT_AUTH: AuthSettings = {
+  method: "jwt",
+  sessionTimeout: 8,
+  mfaEnabled: false,
+  maxLoginAttempts: 5,
+  lockoutDuration: 15,
+};
+
+function loadAuth(): AuthSettings {
+  try {
+    const raw = localStorage.getItem("cnea_auth");
+    if (raw) return { ...DEFAULT_AUTH, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return { ...DEFAULT_AUTH };
 }
 
 const DEFAULT_USERS: UserEntry[] = [
-  { name: "Dr. Chen", role: "Admin", email: "chen@lab.edu", lastActive: "2 min ago" },
-  { name: "Dr. Patel", role: "Researcher", email: "patel@lab.edu", lastActive: "1 hr ago" },
-  { name: "Dr. Kim", role: "Researcher", email: "kim@lab.edu", lastActive: "3 hr ago" },
-  { name: "Dr. Martinez", role: "Researcher", email: "martinez@lab.edu", lastActive: "1 day ago" },
-  { name: "Lab Tech", role: "Operator", email: "tech@lab.edu", lastActive: "5 hr ago" },
+  { id: "u-1", name: "Dr. Chen", role: "Admin", email: "chen@lab.edu", lastActive: "2 min ago", status: "active", permissions: ROLE_DEFAULTS["Admin"] },
+  { id: "u-2", name: "Dr. Patel", role: "Researcher", email: "patel@lab.edu", lastActive: "1 hr ago", status: "active", permissions: ROLE_DEFAULTS["Researcher"] },
+  { id: "u-3", name: "Dr. Kim", role: "Researcher", email: "kim@lab.edu", lastActive: "3 hr ago", status: "active", permissions: ROLE_DEFAULTS["Researcher"] },
+  { id: "u-4", name: "Dr. Martinez", role: "Researcher", email: "martinez@lab.edu", lastActive: "1 day ago", status: "inactive", permissions: ROLE_DEFAULTS["Researcher"] },
+  { id: "u-5", name: "Lab Tech", role: "Operator", email: "tech@lab.edu", lastActive: "5 hr ago", status: "active", permissions: ROLE_DEFAULTS["Operator"] },
 ];
 
 function loadUsers(): UserEntry[] {
@@ -164,7 +235,7 @@ function loadUsers(): UserEntry[] {
     const raw = localStorage.getItem("cnea_users");
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
-  return DEFAULT_USERS.map((u) => ({ ...u }));
+  return DEFAULT_USERS.map((u) => ({ ...u, permissions: [...u.permissions] }));
 }
 
 function saveUsers(users: UserEntry[]) {
@@ -180,6 +251,15 @@ export default function SettingsPage() {
   const [editingPreset, setEditingPreset] = useState<string | null>(null);
   const [presetDraft, setPresetDraft] = useState<Preset | null>(null);
   const [presetSaved, setPresetSaved] = useState<string | null>(null);
+
+  /* ── User state ── */
+  const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [userDraft, setUserDraft] = useState<UserEntry | null>(null);
+  const [userSaved, setUserSaved] = useState<string | null>(null);
+
+  /* ── Auth state ── */
+  const [auth, setAuth] = useState<AuthSettings>(loadAuth);
+  const [authSaved, setAuthSaved] = useState(false);
 
   /* ── LLM state ── */
   const [llm, setLlm] = useState<LLMSettings>(loadLLMSettings);
@@ -294,15 +374,94 @@ export default function SettingsPage() {
   }, []);
 
   const handleAddUser = useCallback(() => {
+    const id = `u-${Date.now()}`;
+    const newUser: UserEntry = {
+      id,
+      name: "",
+      role: "Researcher",
+      email: "",
+      lastActive: "just now",
+      status: "active",
+      permissions: [...ROLE_DEFAULTS["Researcher"]],
+    };
     setUsers((prev) => {
-      const updated = [
-        ...prev,
-        { name: `New User ${prev.length + 1}`, role: "Researcher", email: `user${prev.length + 1}@lab.edu`, lastActive: "just now" },
-      ];
+      const updated = [...prev, newUser];
+      saveUsers(updated);
+      return updated;
+    });
+    setEditingUser(id);
+    setUserDraft(newUser);
+  }, []);
+
+  const handleEditUser = useCallback((user: UserEntry) => {
+    setEditingUser(user.id);
+    setUserDraft({ ...user, permissions: [...user.permissions] });
+  }, []);
+
+  const handleDeleteUser = useCallback((id: string) => {
+    setUsers((prev) => {
+      const updated = prev.filter((u) => u.id !== id);
+      saveUsers(updated);
+      return updated;
+    });
+    if (editingUser === id) {
+      setEditingUser(null);
+      setUserDraft(null);
+    }
+  }, [editingUser]);
+
+  const handleSaveUser = useCallback(() => {
+    if (!userDraft) return;
+    setUsers((prev) => {
+      const updated = prev.map((u) => (u.id === userDraft.id ? { ...userDraft } : u));
+      saveUsers(updated);
+      return updated;
+    });
+    setUserSaved(userDraft.id);
+    setTimeout(() => setUserSaved(null), 2000);
+    setEditingUser(null);
+    setUserDraft(null);
+  }, [userDraft]);
+
+  const handleCancelUser = useCallback(() => {
+    setEditingUser(null);
+    setUserDraft(null);
+  }, []);
+
+  const handleUserRoleChange = useCallback((role: RoleName) => {
+    setUserDraft((d) => d ? { ...d, role, permissions: [...ROLE_DEFAULTS[role]] } : d);
+  }, []);
+
+  const handleTogglePermission = useCallback((perm: Permission) => {
+    setUserDraft((d) => {
+      if (!d) return d;
+      const has = d.permissions.includes(perm);
+      return {
+        ...d,
+        permissions: has
+          ? d.permissions.filter((p) => p !== perm)
+          : [...d.permissions, perm],
+      };
+    });
+  }, []);
+
+  const handleToggleUserStatus = useCallback((id: string) => {
+    setUsers((prev) => {
+      const updated = prev.map((u): UserEntry => {
+        if (u.id !== id) return u;
+        const next: UserEntry["status"] = u.status === "active" ? "locked" : "active";
+        return { ...u, status: next };
+      });
       saveUsers(updated);
       return updated;
     });
   }, []);
+
+  const handleSaveAuth = useCallback(() => {
+    localStorage.setItem("cnea_auth", JSON.stringify(auth));
+    setAuthSaved(true);
+    setTimeout(() => setAuthSaved(false), 2500);
+  }, [auth]);
 
   const currentProvider = useMemo(
     () => PROVIDERS.find((p) => p.key === llm.provider) ?? PROVIDERS[0],
@@ -478,54 +637,305 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* Users */}
+          {/* Users & RBAC */}
           {activeTab === "users" && (
-            <div>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                <div>
-                  <h2 className="text-lg font-semibold text-neural-text-primary">Users & Roles</h2>
-                  <p className="text-sm text-neural-text-muted mt-1">
-                    Manage user accounts and access permissions.
-                  </p>
+            <div className="space-y-8">
+              {/* ── Authentication Settings ── */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Lock className="w-4 h-4 text-neural-accent-purple" />
+                  <h2 className="text-lg font-semibold text-neural-text-primary">Authentication</h2>
                 </div>
-                <button
-                  onClick={handleAddUser}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition self-start"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add User
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                {users.map((user) => (
-                  <div
-                    key={user.email}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg bg-neural-surface-alt border border-neural-border"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-neural-border flex items-center justify-center">
-                        <Users className="w-4 h-4 text-neural-text-muted" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-neural-text-primary">{user.name}</div>
-                        <div className="text-xs text-neural-text-muted">{user.email}</div>
-                      </div>
+                <div className="p-4 rounded-lg bg-neural-surface-alt border border-neural-border space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs text-neural-text-muted">Auth Method</label>
+                      <select
+                        value={auth.method}
+                        onChange={(e) => { setAuth((a) => ({ ...a, method: e.target.value as AuthSettings["method"] })); setAuthSaved(false); }}
+                        className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary"
+                      >
+                        <option value="jwt">JWT Token</option>
+                        <option value="oauth2">OAuth 2.0 / SSO</option>
+                        <option value="ldap">LDAP / Active Directory</option>
+                      </select>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-xs text-neural-text-muted">{user.lastActive}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        user.role === "Admin"
-                          ? "bg-neural-accent-purple/20 text-neural-accent-purple"
-                          : user.role === "Researcher"
-                          ? "bg-neural-accent-blue/20 text-neural-accent-blue"
-                          : "bg-neural-text-muted/20 text-neural-text-muted"
-                      }`}>
-                        {user.role}
-                      </span>
+                    <div>
+                      <label className="text-xs text-neural-text-muted">Session Timeout (hours)</label>
+                      <input
+                        type="number" min={1} max={72} value={auth.sessionTimeout}
+                        onChange={(e) => { setAuth((a) => ({ ...a, sessionTimeout: Number(e.target.value) })); setAuthSaved(false); }}
+                        className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm font-mono text-neural-text-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-neural-text-muted">Max Login Attempts</label>
+                      <input
+                        type="number" min={1} max={20} value={auth.maxLoginAttempts}
+                        onChange={(e) => { setAuth((a) => ({ ...a, maxLoginAttempts: Number(e.target.value) })); setAuthSaved(false); }}
+                        className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm font-mono text-neural-text-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-neural-text-muted">Lockout Duration (min)</label>
+                      <input
+                        type="number" min={1} max={120} value={auth.lockoutDuration}
+                        onChange={(e) => { setAuth((a) => ({ ...a, lockoutDuration: Number(e.target.value) })); setAuthSaved(false); }}
+                        className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm font-mono text-neural-text-primary"
+                      />
+                    </div>
+                    <div className="flex items-end pb-1">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox" checked={auth.mfaEnabled}
+                          onChange={(e) => { setAuth((a) => ({ ...a, mfaEnabled: e.target.checked })); setAuthSaved(false); }}
+                          className="w-4 h-4 rounded border-neural-border accent-neural-accent-cyan"
+                        />
+                        <span className="text-sm text-neural-text-primary">Enable MFA / 2FA</span>
+                      </label>
                     </div>
                   </div>
-                ))}
+                  <button
+                    onClick={handleSaveAuth}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border neural-transition ${
+                      authSaved
+                        ? "bg-neural-accent-green/20 text-neural-accent-green border-neural-accent-green/30"
+                        : "bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border-neural-accent-cyan/30"
+                    }`}
+                  >
+                    {authSaved ? <Check className="w-3 h-3" /> : <Save className="w-3 h-3" />}
+                    {authSaved ? "Saved!" : "Save Auth Settings"}
+                  </button>
+                </div>
+              </div>
+
+              {/* ── RBAC Matrix ── */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <Key className="w-4 h-4 text-neural-accent-yellow" />
+                  <h2 className="text-lg font-semibold text-neural-text-primary">Role Permissions (RBAC)</h2>
+                </div>
+                <div className="overflow-x-auto rounded-lg border border-neural-border">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-neural-surface-alt">
+                        <th className="text-left px-3 py-2 text-neural-text-muted font-medium border-b border-neural-border">Permission</th>
+                        {ROLES.map((r) => (
+                          <th key={r} className="text-center px-3 py-2 text-neural-text-muted font-medium border-b border-neural-border">{r}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ALL_PERMISSIONS.map((p, i) => (
+                        <tr key={p.key} className={i % 2 === 0 ? "bg-neural-surface" : "bg-neural-surface-alt/50"}>
+                          <td className="px-3 py-1.5 text-neural-text-primary">
+                            <span className="text-neural-text-muted mr-1.5">{p.group}:</span>{p.label}
+                          </td>
+                          {ROLES.map((r) => (
+                            <td key={r} className="text-center px-3 py-1.5">
+                              {ROLE_DEFAULTS[r].includes(p.key) ? (
+                                <Check className="w-3.5 h-3.5 text-neural-accent-green mx-auto" />
+                              ) : (
+                                <X className="w-3.5 h-3.5 text-neural-border mx-auto" />
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* ── User List ── */}
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-neural-accent-blue" />
+                    <h2 className="text-lg font-semibold text-neural-text-primary">Users</h2>
+                    <span className="text-xs text-neural-text-muted">({users.length})</span>
+                  </div>
+                  <button
+                    onClick={handleAddUser}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition self-start"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add User
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {users.map((user) => {
+                    const isEditing = editingUser === user.id;
+                    const draft = isEditing ? userDraft! : user;
+                    const justSaved = userSaved === user.id;
+
+                    return (
+                      <div
+                        key={user.id}
+                        className={`p-4 rounded-lg border neural-transition ${
+                          isEditing
+                            ? "bg-neural-surface-alt border-neural-accent-cyan/40"
+                            : justSaved
+                            ? "bg-neural-surface-alt border-neural-accent-green/40"
+                            : "bg-neural-surface-alt border-neural-border"
+                        }`}
+                      >
+                        {isEditing ? (
+                          /* ── Editing user ── */
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-xs text-neural-text-muted">Full Name</label>
+                                <input
+                                  type="text" value={draft.name} autoFocus
+                                  onChange={(e) => setUserDraft((d) => d ? { ...d, name: e.target.value } : d)}
+                                  className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary"
+                                  placeholder="Dr. Smith"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-neural-text-muted">Email</label>
+                                <input
+                                  type="email" value={draft.email}
+                                  onChange={(e) => setUserDraft((d) => d ? { ...d, email: e.target.value } : d)}
+                                  className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary font-mono"
+                                  placeholder="smith@lab.edu"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs text-neural-text-muted">Role</label>
+                                <select
+                                  value={draft.role}
+                                  onChange={(e) => handleUserRoleChange(e.target.value as RoleName)}
+                                  className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary"
+                                >
+                                  {ROLES.map((r) => (
+                                    <option key={r} value={r}>{r}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-xs text-neural-text-muted">Status</label>
+                                <select
+                                  value={draft.status}
+                                  onChange={(e) => setUserDraft((d) => d ? { ...d, status: e.target.value as UserEntry["status"] } : d)}
+                                  className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary"
+                                >
+                                  <option value="active">Active</option>
+                                  <option value="inactive">Inactive</option>
+                                  <option value="locked">Locked</option>
+                                </select>
+                              </div>
+                            </div>
+                            {/* Permissions checkboxes */}
+                            <div>
+                              <label className="text-xs text-neural-text-muted">Permissions (inherited from {draft.role}, customizable)</label>
+                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+                                {ALL_PERMISSIONS.map((p) => (
+                                  <label key={p.key} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={draft.permissions.includes(p.key)}
+                                      onChange={() => handleTogglePermission(p.key)}
+                                      className="w-3.5 h-3.5 rounded border-neural-border accent-neural-accent-cyan"
+                                    />
+                                    <span className="text-neural-text-secondary">{p.label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={handleSaveUser}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-neural-accent-green/20 text-neural-accent-green hover:bg-neural-accent-green/30 border border-neural-accent-green/30 neural-transition"
+                              >
+                                <Check className="w-3 h-3" /> Save User
+                              </button>
+                              <button
+                                onClick={handleCancelUser}
+                                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-neural-text-muted hover:text-neural-text-primary hover:bg-neural-border neural-transition"
+                              >
+                                <X className="w-3 h-3" /> Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          /* ── Display mode ── */
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                                user.status === "active" ? "bg-neural-accent-green/20" : user.status === "locked" ? "bg-neural-accent-red/20" : "bg-neural-border"
+                              }`}>
+                                {user.status === "locked" ? (
+                                  <Lock className="w-4 h-4 text-neural-accent-red" />
+                                ) : (
+                                  <Users className="w-4 h-4 text-neural-text-muted" />
+                                )}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-neural-text-primary">{user.name || "Unnamed"}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                    user.role === "Admin"
+                                      ? "bg-neural-accent-purple/20 text-neural-accent-purple"
+                                      : user.role === "Researcher"
+                                      ? "bg-neural-accent-blue/20 text-neural-accent-blue"
+                                      : user.role === "Operator"
+                                      ? "bg-neural-accent-cyan/20 text-neural-accent-cyan"
+                                      : "bg-neural-text-muted/20 text-neural-text-muted"
+                                  }`}>
+                                    {user.role}
+                                  </span>
+                                  {user.status !== "active" && (
+                                    <span className={`px-1.5 py-0.5 rounded text-xs ${
+                                      user.status === "locked"
+                                        ? "bg-neural-accent-red/20 text-neural-accent-red"
+                                        : "bg-neural-text-muted/20 text-neural-text-muted"
+                                    }`}>
+                                      {user.status}
+                                    </span>
+                                  )}
+                                  {justSaved && (
+                                    <span className="flex items-center gap-1 text-xs text-neural-accent-green">
+                                      <Check className="w-3 h-3" /> Saved
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-neural-text-muted mt-0.5">
+                                  {user.email} &middot; {user.lastActive} &middot; {user.permissions.length} permissions
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleToggleUserStatus(user.id)}
+                                title={user.status === "active" ? "Lock account" : "Unlock account"}
+                                className="p-2 rounded-lg text-neural-text-muted hover:text-neural-text-primary hover:bg-neural-border neural-transition"
+                              >
+                                {user.status === "active" ? <Lock className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                              </button>
+                              <button
+                                onClick={() => handleEditUser(user)}
+                                title="Edit user"
+                                className="p-2 rounded-lg hover:bg-neural-border text-neural-text-muted hover:text-neural-text-primary neural-transition"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(user.id)}
+                                title="Delete user"
+                                className="p-2 rounded-lg hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-red neural-transition"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
