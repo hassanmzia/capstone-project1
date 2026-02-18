@@ -44,3 +44,9 @@ recording_data/
 *.dll
 *.so
 *.dylib
+
+# FPGA bitstreams (large binary files)
+*.bit
+
+# Large data files
+legacy/Raw_Data2.csv
