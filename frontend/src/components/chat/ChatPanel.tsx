@@ -261,6 +261,18 @@ export default function ChatPanel() {
   const handleSend = () => {
     if (!input.trim() || isStreaming) return;
 
+    if (!isConnected) {
+      dispatch(
+        addMessage({
+          id: generateId(),
+          role: "assistant",
+          content: "Unable to reach the AI assistant. Please wait for the connection to be restored.",
+          timestamp: new Date().toISOString(),
+        })
+      );
+      return;
+    }
+
     const userMessage: ChatMessage = {
       id: generateId(),
       role: "user",

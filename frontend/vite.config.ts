@@ -18,6 +18,11 @@ export default defineConfig({
         target: "http://172.168.1.95:3026",
         changeOrigin: true,
       },
+      "/ws": {
+        target: "http://172.168.1.95:3026",
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 });
