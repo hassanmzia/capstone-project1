@@ -38,6 +38,8 @@ export default function SpectrogramDisplay({
   const animRef = useRef<number>(0);
   const spectrogramBufferRef = useRef<Float32Array[]>([]);
   const maxColumnsRef = useRef(256);
+  const columnsEmittedRef = useRef(0);
+  const startTimeRef = useRef(Date.now());
 
   const [windowSize, setWindowSize] = useState(propWindowSize ?? 512);
   const [hopSize] = useState(propHopSize ?? 256);
@@ -145,16 +147,25 @@ export default function SpectrogramDisplay({
 
       maxColumnsRef.current = Math.round(plotW);
 
-      // Get new data and compute FFT columns
-      const totalSamples = windowSize * 4; // Process last few windows
-      const samples = getLatestData(channel, totalSamples);
+      // Compute only NEW FFT columns based on elapsed time
+      const elapsedSec = (Date.now() - startTimeRef.current) / 1000;
+      const expectedColumns = Math.floor(elapsedSec * sampleRate / hopSize);
+      const newColumnsNeeded = Math.min(expectedColumns - columnsEmittedRef.current, 10);
 
-      if (samples.length >= windowSize) {
-        // Compute new FFT columns
-        for (let offset = 0; offset + windowSize <= samples.length; offset += hopSize) {
-          const segment = samples.subarray(offset, offset + windowSize);
-          const column = computeFFTColumn(segment);
-          spectrogramBufferRef.current.push(column);
+      if (newColumnsNeeded > 0) {
+        const totalSamples = windowSize + newColumnsNeeded * hopSize;
+        const samples = getLatestData(channel, totalSamples);
+
+        if (samples.length >= windowSize) {
+          for (let i = 0; i < newColumnsNeeded; i++) {
+            const offset = samples.length - windowSize - (newColumnsNeeded - 1 - i) * hopSize;
+            if (offset >= 0) {
+              const segment = samples.subarray(offset, offset + windowSize);
+              const column = computeFFTColumn(segment);
+              spectrogramBufferRef.current.push(column);
+            }
+          }
+          columnsEmittedRef.current = expectedColumns;
         }
 
         // Trim to max columns
@@ -169,9 +180,15 @@ export default function SpectrogramDisplay({
         return;
       }
 
-      // Find global dB range for color mapping
-      const dBMax = 0;
-      const dBMin = -dynamicRange;
+      // Adaptive dB range: scan actual data for peak level
+      let peakdB = -Infinity;
+      for (const col of columns) {
+        for (let i = 0; i < maxBin; i++) {
+          if (col[i] > peakdB) peakdB = col[i];
+        }
+      }
+      const dBMax = isFinite(peakdB) ? Math.ceil(peakdB / 5) * 5 : 0;
+      const dBMin = dBMax - dynamicRange;
 
       // Render spectrogram image
       const imgW = columns.length;
@@ -261,7 +278,7 @@ export default function SpectrogramDisplay({
       running = false;
       cancelAnimationFrame(animRef.current);
     };
-  }, [channel, windowSize, hopSize, maxFrequency, maxBin, dynamicRange, lut, getLatestData, computeFFTColumn]);
+  }, [channel, windowSize, hopSize, sampleRate, maxFrequency, maxBin, dynamicRange, lut, getLatestData, computeFFTColumn]);
 
   return (
     <div className={`flex flex-col bg-neural-surface rounded-xl border border-neural-border ${className}`}>
@@ -278,6 +295,8 @@ export default function SpectrogramDisplay({
               onChange={(e) => {
                 setWindowSize(Number(e.target.value));
                 spectrogramBufferRef.current = [];
+                columnsEmittedRef.current = 0;
+                startTimeRef.current = Date.now();
               }}
               className="bg-neural-surface-alt border border-neural-border rounded px-1 py-0.5 text-[10px] text-neural-text-primary"
             >
