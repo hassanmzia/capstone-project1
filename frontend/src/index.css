@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@theme {
+  --color-neural-bg: #0a0e1a;
+  --color-neural-surface: #111827;
+  --color-neural-surface-alt: #1a2332;
+  --color-neural-border: #1e293b;
+  --color-neural-border-bright: #334155;
+  --color-neural-accent-cyan: #06b6d4;
+  --color-neural-accent-green: #10b981;
+  --color-neural-accent-blue: #3b82f6;
+  --color-neural-accent-purple: #8b5cf6;
+  --color-neural-accent-amber: #f59e0b;
+  --color-neural-accent-red: #ef4444;
+  --color-neural-accent-rose: #f43f5e;
+  --color-neural-text-primary: #f1f5f9;
+  --color-neural-text-secondary: #94a3b8;
+  --color-neural-text-muted: #64748b;
+  --color-neural-spike: #22d3ee;
+  --color-neural-waveform: #34d399;
+  --color-neural-heatmap-low: #0c1426;
+  --color-neural-heatmap-mid: #1e40af;
+  --color-neural-heatmap-high: #06b6d4;
+  --color-neural-heatmap-peak: #f0fdfa;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-neural-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-neural-border-bright);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neural-text-muted);
+}
+
+/* Pulse animation for recording indicator */
+@keyframes neural-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.animate-neural-pulse {
+  animation: neural-pulse 1.5s ease-in-out infinite;
+}
+
+/* Glow effects for active elements */
+.neural-glow-cyan {
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.3), 0 0 4px rgba(6, 182, 212, 0.1);
+}
+
+.neural-glow-green {
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.3), 0 0 4px rgba(16, 185, 129, 0.1);
+}
+
+.neural-glow-red {
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3), 0 0 4px rgba(239, 68, 68, 0.1);
+}
+
+/* Grid pattern background for visualization areas */
+.neural-grid-bg {
+  background-image:
+    linear-gradient(rgba(30, 41, 59, 0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30, 41, 59, 0.5) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Smooth transitions */
+.neural-transition {
+  transition: all 0.2s ease-in-out;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
