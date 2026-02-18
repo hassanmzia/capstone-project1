@@ -79,12 +79,58 @@ export default function TelemetryPanel({ className = "" }: TelemetryPanelProps) 
     }
   }, []);
 
-  useWebSocket({
+  const { isConnected: wsConnected } = useWebSocket({
     url: "/ws/telemetry",
     onMessage: handleMessage,
     autoConnect: true,
     reconnect: true,
   });
+
+  // Mock telemetry fallback when no backend
+  const mockIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (wsConnected) {
+      if (mockIntervalRef.current) {
+        clearInterval(mockIntervalRef.current);
+        mockIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const startTimer = setTimeout(() => {
+      if (mockIntervalRef.current) return;
+      mockIntervalRef.current = setInterval(() => {
+        const mockThroughput = 420 + Math.random() * 60;
+        setTelemetry({
+          usbThroughputMbps: mockThroughput,
+          bufferUtilization: 25 + Math.random() * 30,
+          packetLossCount: 0,
+          packetLossRate: 0,
+          sampleRate: 30000,
+          fpgaTemp: 34 + Math.random() * 6,
+          recordingActive: false,
+          recordingStartTime: null,
+          agents: [
+            { name: "Spike Detector", status: "online", lastHeartbeat: Date.now() },
+            { name: "Data Archiver", status: "online", lastHeartbeat: Date.now() },
+            { name: "Burst Analyzer", status: "online", lastHeartbeat: Date.now() },
+          ],
+        });
+        setThroughputHistory((prev) => {
+          const next = [...prev, mockThroughput];
+          return next.length > 60 ? next.slice(-60) : next;
+        });
+      }, 1000);
+    }, 3000);
+
+    return () => {
+      clearTimeout(startTimer);
+      if (mockIntervalRef.current) {
+        clearInterval(mockIntervalRef.current);
+        mockIntervalRef.current = null;
+      }
+    };
+  }, [wsConnected]);
 
   // Recording timer
   useEffect(() => {

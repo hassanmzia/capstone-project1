@@ -16,8 +16,8 @@ import {
 const analysisJobs = [
   { id: "a-001", type: "Spike Sorting", recording: "session_042", status: "completed", progress: 100, duration: "4m 32s", result: "3,847 units classified" },
   { id: "a-002", type: "Burst Detection", recording: "session_041", status: "completed", progress: 100, duration: "1m 18s", result: "142 bursts detected" },
-  { id: "a-003", type: "PCA Analysis", recording: "session_042", status: "running", progress: 67, duration: "2m 10s", result: "" },
-  { id: "a-004", type: "Cross-Correlation", recording: "session_040", status: "queued", progress: 0, duration: "--", result: "" },
+  { id: "a-003", type: "PCA Analysis", recording: "session_042", status: "completed", progress: 100, duration: "3m 45s", result: "3 components, 85.2% variance" },
+  { id: "a-004", type: "Cross-Correlation", recording: "session_040", status: "completed", progress: 100, duration: "5m 12s", result: "48 significant pairs" },
 ];
 
 const analysisTypes = [

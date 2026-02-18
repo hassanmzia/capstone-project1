@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   HardDrive,
@@ -13,6 +13,9 @@ import {
   SortDesc,
   SortAsc,
   Circle,
+  X,
+  Cpu,
+  Activity,
 } from "lucide-react";
 
 interface MockRecording {
@@ -37,14 +40,108 @@ const mockRecordings: MockRecording[] = [
   { id: "rec-037", name: "session_037_failed", experimentName: "Retinal Ganglion Response Mapping", date: "2026-02-14 09:00", duration: "02:15", spikeCount: 1200, channels: 128, fileSize: "320 MB", format: "RAW", status: "error" },
 ];
 
+const availableExperiments = [
+  { id: "exp-001", name: "Hippocampal CA1 Place Cell Study" },
+  { id: "exp-002", name: "Cortical Spike Timing Analysis" },
+  { id: "exp-003", name: "Retinal Ganglion Response Mapping" },
+  { id: "exp-004", name: "Drug Screening - Compound 47B" },
+];
+
+type RecordingPhase = "idle" | "setup" | "recording";
+
 export default function RecordingBrowserPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [recordings, setRecordings] = useState(mockRecordings);
-  const [isRecording, setIsRecording] = useState(false);
+  const [phase, setPhase] = useState<RecordingPhase>("idle");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [sortAsc, setSortAsc] = useState(false);
+
+  // Setup form state
+  const [setupName, setSetupName] = useState("");
+  const [setupExperiment, setSetupExperiment] = useState(availableExperiments[0].id);
+  const [setupChannels, setSetupChannels] = useState("64");
+  const [setupFormat, setSetupFormat] = useState("HDF5");
+  const [setupSampleRate, setSetupSampleRate] = useState("30000");
+
+  // Recording timer
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number>(0);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const nextSessionNum = 43 + recordings.length;
+  const defaultName = `session_${String(nextSessionNum).padStart(3, "0")}`;
+
+  const handleStartSetup = () => {
+    setSetupName(defaultName);
+    setSetupExperiment(availableExperiments[0].id);
+    setSetupChannels("64");
+    setSetupFormat("HDF5");
+    setSetupSampleRate("30000");
+    setPhase("setup");
+  };
+
+  const handleBeginRecording = () => {
+    setElapsedSec(0);
+    startTimeRef.current = Date.now();
+    timerRef.current = setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - startTimeRef.current) / 1000));
+    }, 1000);
+    setPhase("recording");
+  };
+
+  const handleStopRecording = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    const exp = availableExperiments.find((e) => e.id === setupExperiment);
+    const mins = Math.floor(elapsedSec / 60);
+    const secs = elapsedSec % 60;
+    const duration = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    const channels = parseInt(setupChannels) || 64;
+    const sizeEstMB = Math.round(channels * (parseInt(setupSampleRate) || 30000) * 2 * elapsedSec / 1e6);
+
+    const id = `rec-${String(nextSessionNum).padStart(3, "0")}`;
+    setRecordings((prev) => [
+      {
+        id,
+        name: setupName || defaultName,
+        experimentName: exp?.name || "Unknown Experiment",
+        date: new Date().toISOString().slice(0, 16).replace("T", " "),
+        duration,
+        spikeCount: 0,
+        channels,
+        fileSize: sizeEstMB >= 1000 ? `${(sizeEstMB / 1000).toFixed(1)} GB` : `${sizeEstMB} MB`,
+        format: setupFormat,
+        status: "processing" as const,
+      },
+      ...prev,
+    ]);
+    setPhase("idle");
+  };
+
+  const handleCancelSetup = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setPhase("idle");
+  };
+
+  const formatTimer = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
 
   const handleDelete = useCallback((id: string) => {
     setRecordings((prev) => prev.filter((r) => r.id !== id));
@@ -121,41 +218,146 @@ export default function RecordingBrowserPage() {
             {sortAsc ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
             Sort
           </button>
-          <button
-            onClick={() => {
-              if (isRecording) {
-                const id = `rec-${String(43 + recordings.length).padStart(3, "0")}`;
-                setRecordings((prev) => [
-                  {
-                    id,
-                    name: `session_${String(43 + prev.length).padStart(3, "0")}`,
-                    experimentName: "New Recording",
-                    date: new Date().toISOString().slice(0, 16).replace("T", " "),
-                    duration: "00:00",
-                    spikeCount: 0,
-                    channels: 64,
-                    fileSize: "0 MB",
-                    format: "HDF5",
-                    status: "processing" as const,
-                  },
-                  ...prev,
-                ]);
-                setIsRecording(false);
-              } else {
-                setIsRecording(true);
-              }
-            }}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border neural-transition ${
-              isRecording
-                ? "bg-neural-accent-red/20 text-neural-accent-red border-neural-accent-red/30 hover:bg-neural-accent-red/30"
-                : "bg-neural-accent-green/20 text-neural-accent-green border-neural-accent-green/30 hover:bg-neural-accent-green/30"
-            }`}
-          >
-            <Circle className={`w-3 h-3 ${isRecording ? "fill-neural-accent-red" : ""}`} />
-            {isRecording ? "Stop Recording" : "Start Recording"}
-          </button>
+          {phase === "recording" ? (
+            <button
+              onClick={handleStopRecording}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border neural-transition bg-neural-accent-red/20 text-neural-accent-red border-neural-accent-red/30 hover:bg-neural-accent-red/30"
+            >
+              <Circle className="w-3 h-3 fill-neural-accent-red animate-pulse" />
+              Stop Recording ({formatTimer(elapsedSec)})
+            </button>
+          ) : (
+            <button
+              onClick={handleStartSetup}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm border neural-transition bg-neural-accent-green/20 text-neural-accent-green border-neural-accent-green/30 hover:bg-neural-accent-green/30"
+            >
+              <Circle className="w-3 h-3" />
+              Start Recording
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Recording Setup Panel */}
+      {phase === "setup" && (
+        <div className="bg-neural-surface rounded-xl border border-neural-accent-green/30 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-neural-accent-green flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              New Recording Setup
+            </h2>
+            <button
+              onClick={handleCancelSetup}
+              className="p-1 rounded-lg hover:bg-neural-surface-alt text-neural-text-muted hover:text-neural-text-primary neural-transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className="text-xs text-neural-text-muted block mb-1">Session Name</label>
+              <input
+                type="text"
+                value={setupName}
+                onChange={(e) => setSetupName(e.target.value)}
+                className="w-full bg-neural-surface-alt border border-neural-border rounded-lg px-3 py-2 text-sm font-mono text-neural-text-primary focus:outline-none focus:border-neural-accent-cyan/50"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs text-neural-text-muted block mb-1">Linked Experiment</label>
+              <select
+                value={setupExperiment}
+                onChange={(e) => setSetupExperiment(e.target.value)}
+                className="w-full bg-neural-surface-alt border border-neural-border rounded-lg px-3 py-2 text-sm text-neural-text-primary focus:outline-none focus:border-neural-accent-cyan/50"
+              >
+                {availableExperiments.map((exp) => (
+                  <option key={exp.id} value={exp.id}>{exp.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-neural-text-muted block mb-1">Channel Count</label>
+              <select
+                value={setupChannels}
+                onChange={(e) => setSetupChannels(e.target.value)}
+                className="w-full bg-neural-surface-alt border border-neural-border rounded-lg px-3 py-2 text-sm font-mono text-neural-text-primary focus:outline-none focus:border-neural-accent-cyan/50"
+              >
+                <option value="16">16 channels</option>
+                <option value="32">32 channels</option>
+                <option value="64">64 channels</option>
+                <option value="128">128 channels</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-neural-text-muted block mb-1">Sample Rate</label>
+              <select
+                value={setupSampleRate}
+                onChange={(e) => setSetupSampleRate(e.target.value)}
+                className="w-full bg-neural-surface-alt border border-neural-border rounded-lg px-3 py-2 text-sm font-mono text-neural-text-primary focus:outline-none focus:border-neural-accent-cyan/50"
+              >
+                <option value="20000">20,000 Hz</option>
+                <option value="30000">30,000 Hz</option>
+                <option value="40000">40,000 Hz</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-neural-text-muted block mb-1">Output Format</label>
+              <select
+                value={setupFormat}
+                onChange={(e) => setSetupFormat(e.target.value)}
+                className="w-full bg-neural-surface-alt border border-neural-border rounded-lg px-3 py-2 text-sm text-neural-text-primary focus:outline-none focus:border-neural-accent-cyan/50"
+              >
+                <option value="HDF5">HDF5</option>
+                <option value="NWB">NWB</option>
+                <option value="RAW">RAW Binary</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-neural-border">
+            <p className="text-xs text-neural-text-muted">
+              <Cpu className="w-3 h-3 inline mr-1" />
+              {setupChannels} ch &middot; {parseInt(setupSampleRate).toLocaleString()} Hz &middot; {setupFormat}
+            </p>
+            <button
+              onClick={handleBeginRecording}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-neural-accent-green/20 text-neural-accent-green border border-neural-accent-green/30 hover:bg-neural-accent-green/30 neural-transition"
+            >
+              <Circle className="w-3 h-3" />
+              Begin Recording
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Active Recording Banner */}
+      {phase === "recording" && (
+        <div className="bg-neural-surface rounded-xl border border-neural-accent-red/30 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Circle className="w-3 h-3 fill-neural-accent-red animate-pulse" />
+                <span className="text-sm font-semibold text-neural-accent-red">Recording</span>
+              </div>
+              <span className="text-lg font-mono text-neural-text-primary">{formatTimer(elapsedSec)}</span>
+              <span className="text-xs text-neural-text-muted">
+                {setupName || defaultName} &middot; {setupChannels} ch &middot; {setupFormat}
+              </span>
+            </div>
+            <button
+              onClick={handleStopRecording}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm bg-neural-accent-red/20 text-neural-accent-red border border-neural-accent-red/30 hover:bg-neural-accent-red/30 neural-transition"
+            >
+              Stop & Save
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="flex-1 bg-neural-surface rounded-xl border border-neural-border overflow-hidden">

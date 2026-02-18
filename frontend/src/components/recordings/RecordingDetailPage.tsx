@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -186,6 +187,106 @@ function statusBadge(status: string) {
   );
 }
 
+/* ---------- Channel map grid component ---------- */
+
+// Deterministic pseudo-random for consistent renders
+function seededRandom(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return s / 2147483647;
+  };
+}
+
+function ChannelMapGrid({ channels, snr }: { channels: number; snr: string }) {
+  // Determine grid layout based on channel count
+  const cols = channels <= 32 ? 8 : channels <= 64 ? 8 : 16;
+  const rows = Math.ceil(channels / cols);
+  const snrVal = parseFloat(snr) || 0;
+
+  // Generate stable mock activity per channel
+  const activities = useMemo(() => {
+    const rand = seededRandom(channels * 1000 + Math.round(snrVal * 10));
+    return Array.from({ length: channels }, (_, i) => {
+      // Create spatial clustering: center channels tend to be more active
+      const row = Math.floor(i / cols);
+      const col = i % cols;
+      const cx = (col / (cols - 1)) * 2 - 1; // -1 to 1
+      const cy = (row / (rows - 1)) * 2 - 1;
+      const dist = Math.sqrt(cx * cx + cy * cy);
+      const spatial = Math.max(0, 1 - dist * 0.6);
+      return Math.min(1, spatial * 0.7 + rand() * 0.5);
+    });
+  }, [channels, snrVal, cols, rows]);
+
+  // Color mapping: dark blue -> cyan -> green -> yellow
+  const activityColor = (val: number) => {
+    if (val < 0.25) return `rgba(30, 58, 138, ${0.4 + val * 2})`;
+    if (val < 0.5) return `rgba(6, 182, 212, ${0.3 + val})`;
+    if (val < 0.75) return `rgba(34, 197, 94, ${0.3 + val})`;
+    return `rgba(250, 204, 21, ${0.4 + val * 0.5})`;
+  };
+
+  const cellSize = channels <= 32 ? 28 : channels <= 64 ? 24 : 16;
+  const gap = 2;
+
+  return (
+    <div className="bg-neural-surface rounded-xl border border-neural-border p-5">
+      <h2 className="text-sm font-semibold text-neural-text-primary mb-3 flex items-center gap-2">
+        <Cpu className="w-4 h-4 text-neural-text-muted" />
+        Channel Map
+      </h2>
+      <div className="rounded-lg bg-neural-surface-alt border border-neural-border p-3">
+        <div
+          className="mx-auto"
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${cols}, ${cellSize}px)`,
+            gap: `${gap}px`,
+            width: "fit-content",
+          }}
+        >
+          {activities.map((val, i) => (
+            <div
+              key={i}
+              title={`Ch ${i}: ${(val * 100).toFixed(0)}% activity`}
+              className="rounded-sm cursor-default"
+              style={{
+                width: cellSize,
+                height: cellSize,
+                backgroundColor: activityColor(val),
+                border: "1px solid rgba(255,255,255,0.06)",
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Legend */}
+        <div className="flex items-center justify-between mt-3 pt-2 border-t border-neural-border">
+          <span className="text-[10px] text-neural-text-muted">{channels} channels</span>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-neural-text-muted">Low</span>
+            <div className="flex gap-0.5">
+              {[0.1, 0.3, 0.5, 0.7, 0.9].map((v) => (
+                <div
+                  key={v}
+                  className="rounded-sm"
+                  style={{
+                    width: 10,
+                    height: 8,
+                    backgroundColor: activityColor(v),
+                  }}
+                />
+              ))}
+            </div>
+            <span className="text-[10px] text-neural-text-muted">High</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RecordingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -360,17 +461,8 @@ export default function RecordingDetailPage() {
               )}
             </div>
 
-            {/* Channel map placeholder */}
-            <div className="bg-neural-surface rounded-xl border border-neural-border p-5">
-              <h2 className="text-sm font-semibold text-neural-text-primary mb-3">Channel Map</h2>
-              <div className="aspect-square rounded-lg bg-neural-surface-alt border border-neural-border flex items-center justify-center">
-                <div className="text-center">
-                  <Cpu className="w-8 h-8 text-neural-text-muted mx-auto mb-2" />
-                  <p className="text-xs text-neural-text-muted">{rec.channels}-channel array</p>
-                  <p className="text-xs text-neural-text-muted mt-0.5">Visualization available in the Visualization tab</p>
-                </div>
-              </div>
-            </div>
+            {/* Channel map */}
+            <ChannelMapGrid channels={rec.channels} snr={rec.snr} />
           </div>
         </div>
       </div>

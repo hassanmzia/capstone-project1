@@ -8,6 +8,40 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { useWebSocket } from "./useWebSocket";
 import { ClientRingBuffer } from "@/components/common/RingBuffer";
 
+/* ---------- Mock data generator for demo mode ---------- */
+const MOCK_SAMPLE_RATE = 30000;
+const MOCK_BATCH_SIZE = 1500; // samples per batch (50ms at 30kHz)
+
+function generateMockBatch(channelCount: number, batchIndex: number): Float32Array[] {
+  const channels: Float32Array[] = [];
+  const t0 = batchIndex * MOCK_BATCH_SIZE;
+
+  for (let ch = 0; ch < channelCount; ch++) {
+    const samples = new Float32Array(MOCK_BATCH_SIZE);
+    // Each channel gets a unique mix of frequencies
+    const baseFreq = 5 + (ch % 8) * 3; // 5-26 Hz theta/beta range
+    const fastFreq = 80 + (ch % 5) * 40; // 80-240 Hz gamma range
+    const ampBase = 80 + (ch % 4) * 20; // 80-140 µV
+    const ampFast = 15 + (ch % 3) * 5;
+
+    for (let s = 0; s < MOCK_BATCH_SIZE; s++) {
+      const t = (t0 + s) / MOCK_SAMPLE_RATE;
+      // Slow oscillation + fast oscillation + noise
+      samples[s] =
+        ampBase * Math.sin(2 * Math.PI * baseFreq * t + ch * 0.7) +
+        ampFast * Math.sin(2 * Math.PI * fastFreq * t + ch * 1.3) +
+        (Math.random() - 0.5) * 40; // ±20 µV noise
+
+      // Occasional spike-like events (~1% chance per sample)
+      if (Math.random() < 0.0003) {
+        samples[s] += (Math.random() > 0.5 ? 1 : -1) * (200 + Math.random() * 150);
+      }
+    }
+    channels.push(samples);
+  }
+  return channels;
+}
+
 interface DataStreamConfig {
   channelCount?: number;
   samplesPerChannel?: number;
@@ -167,6 +201,68 @@ export function useDataStream(config: DataStreamConfig = {}): DataStreamReturn {
   useEffect(() => {
     setIsConnected(wsConnected);
   }, [wsConnected]);
+
+  // ---------- Mock data fallback when no backend ----------
+  const mockBatchIndexRef = useRef(0);
+  const mockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mockStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Start mock data generation after 3 seconds without connection
+  useEffect(() => {
+    if (wsConnected) {
+      // Real connection: stop mock if running
+      if (mockTimerRef.current) {
+        clearInterval(mockTimerRef.current);
+        mockTimerRef.current = null;
+      }
+      if (mockStartTimerRef.current) {
+        clearTimeout(mockStartTimerRef.current);
+        mockStartTimerRef.current = null;
+      }
+      return;
+    }
+
+    // Wait 3 seconds before starting mock data
+    mockStartTimerRef.current = setTimeout(() => {
+      if (mockTimerRef.current) return; // Already running
+
+      setIsConnected(true); // Indicate data is flowing (demo mode)
+      mockBatchIndexRef.current = 0;
+
+      mockTimerRef.current = setInterval(() => {
+        const rb = ringBufferRef.current;
+        if (!rb) return;
+
+        const batch = generateMockBatch(channelCount, mockBatchIndexRef.current);
+        rb.push(batch);
+        mockBatchIndexRef.current++;
+
+        // Update rate/fill stats
+        sampleCountRef.current += MOCK_BATCH_SIZE;
+        setPacketCount((prev) => prev + 1);
+
+        const now = Date.now();
+        if (now - lastRateUpdateRef.current > 1000) {
+          const elapsed = (now - lastRateUpdateRef.current) / 1000;
+          setDataRate(Math.round(sampleCountRef.current / elapsed));
+          sampleCountRef.current = 0;
+          lastRateUpdateRef.current = now;
+        }
+        setBufferFill(rb.getFillLevel(0));
+      }, 50); // 50ms interval = 20 batches/sec
+    }, 3000);
+
+    return () => {
+      if (mockTimerRef.current) {
+        clearInterval(mockTimerRef.current);
+        mockTimerRef.current = null;
+      }
+      if (mockStartTimerRef.current) {
+        clearTimeout(mockStartTimerRef.current);
+        mockStartTimerRef.current = null;
+      }
+    };
+  }, [wsConnected, channelCount]);
 
   const getLatestData = useCallback(
     (channelIndex: number, length: number): Float32Array => {
