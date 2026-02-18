@@ -224,21 +224,21 @@ export default function SettingsPage() {
         <h1 className="text-lg font-semibold text-neural-text-primary">Settings</h1>
       </div>
 
-      <div className="flex gap-4 flex-1 min-h-0">
-        {/* Tabs sidebar */}
-        <div className="w-56 bg-neural-surface rounded-xl border border-neural-border p-2">
-          <nav className="space-y-1">
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+        {/* Tabs — horizontal scroll on small screens, vertical sidebar on lg+ */}
+        <div className="lg:w-56 bg-neural-surface rounded-xl border border-neural-border p-2 shrink-0">
+          <nav className="flex lg:flex-col gap-1 overflow-x-auto lg:overflow-x-visible">
             {settingsTabs.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setActiveTab(id)}
-                className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium neural-transition ${
+                className={`flex items-center gap-2 lg:gap-3 w-max lg:w-full px-3 py-2 lg:py-2.5 rounded-lg text-sm font-medium whitespace-nowrap neural-transition ${
                   activeTab === id
                     ? "bg-neural-accent-cyan/10 text-neural-accent-cyan"
                     : "text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-surface-alt"
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-4 h-4 shrink-0" />
                 {label}
               </button>
             ))}
@@ -246,11 +246,11 @@ export default function SettingsPage() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 bg-neural-surface rounded-xl border border-neural-border p-6 overflow-y-auto">
+        <div className="flex-1 bg-neural-surface rounded-xl border border-neural-border p-4 sm:p-6 overflow-y-auto min-h-0">
           {/* Presets */}
           {activeTab === "presets" && (
             <div>
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
                   <h2 className="text-lg font-semibold text-neural-text-primary">Hardware Presets</h2>
                   <p className="text-sm text-neural-text-muted mt-1">
@@ -259,7 +259,7 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={handleNewPreset}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition self-start"
                 >
                   <Plus className="w-4 h-4" />
                   New Preset
@@ -270,7 +270,7 @@ export default function SettingsPage() {
                 {presets.map((preset) => (
                   <div
                     key={preset.id}
-                    className="flex items-center justify-between p-4 rounded-lg bg-neural-surface-alt border border-neural-border"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg bg-neural-surface-alt border border-neural-border"
                   >
                     <div>
                       <div className="flex items-center gap-2">
@@ -310,7 +310,7 @@ export default function SettingsPage() {
           {/* Users */}
           {activeTab === "users" && (
             <div>
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
                   <h2 className="text-lg font-semibold text-neural-text-primary">Users & Roles</h2>
                   <p className="text-sm text-neural-text-muted mt-1">
@@ -319,7 +319,7 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={handleAddUser}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition self-start"
                 >
                   <Plus className="w-4 h-4" />
                   Add User
@@ -330,7 +330,7 @@ export default function SettingsPage() {
                 {users.map((user) => (
                   <div
                     key={user.email}
-                    className="flex items-center justify-between p-3 rounded-lg bg-neural-surface-alt border border-neural-border"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg bg-neural-surface-alt border border-neural-border"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-neural-border flex items-center justify-center">
@@ -384,9 +384,9 @@ export default function SettingsPage() {
                           : "bg-neural-surface-alt border-neural-border"
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                         <div className="flex items-center gap-2">
-                          <Cpu className="w-4 h-4 text-neural-accent-cyan" />
+                          <Cpu className="w-4 h-4 text-neural-accent-cyan shrink-0" />
                           <span className="text-sm font-medium text-neural-text-primary">
                             {agent.label}
                           </span>
@@ -421,7 +421,7 @@ export default function SettingsPage() {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-3 gap-4 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                         {/* Heartbeat */}
                         <div>
                           <span className="text-neural-text-muted">Heartbeat Interval</span>
@@ -637,7 +637,7 @@ export default function SettingsPage() {
                     <Globe className="w-4 h-4 text-neural-accent-blue" />
                     <span className="text-sm font-medium text-neural-text-primary">Network</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                     <div>
                       <span className="text-neural-text-muted">BFF Address</span>
                       <div className="text-neural-text-primary font-mono mt-0.5">172.168.1.95:3026</div>
@@ -654,7 +654,7 @@ export default function SettingsPage() {
                     <Database className="w-4 h-4 text-neural-accent-green" />
                     <span className="text-sm font-medium text-neural-text-primary">Storage</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                     <div>
                       <span className="text-neural-text-muted">Total Space</span>
                       <div className="text-neural-text-primary font-mono mt-0.5">4.0 TB</div>
@@ -675,7 +675,7 @@ export default function SettingsPage() {
                     <Shield className="w-4 h-4 text-neural-accent-purple" />
                     <span className="text-sm font-medium text-neural-text-primary">Security</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                     <div>
                       <span className="text-neural-text-muted">Auth Mode</span>
                       <div className="text-neural-text-primary font-mono mt-0.5">JWT Token</div>
