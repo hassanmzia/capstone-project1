@@ -184,9 +184,16 @@ const DEFAULT_PRESETS: Preset[] = [
 function loadPresets(): Preset[] {
   try {
     const raw = localStorage.getItem("cnea_presets");
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed: Preset[] = JSON.parse(raw);
+      // Migrate presets saved before the hardware field existed
+      return parsed.map((p) => ({
+        ...p,
+        hardware: p.hardware ? { ...DEFAULT_HW, ...p.hardware } : { ...DEFAULT_HW },
+      }));
+    }
   } catch { /* ignore */ }
-  return DEFAULT_PRESETS.map((p) => ({ ...p }));
+  return DEFAULT_PRESETS.map((p) => ({ ...p, hardware: { ...p.hardware } }));
 }
 
 function savePresets(presets: Preset[]) {
