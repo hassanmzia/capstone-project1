@@ -12,6 +12,7 @@ channels-redis>=4.2
 
 # Database
 psycopg2-binary>=2.9
+asyncpg>=0.29
 dj-database-url>=2.1
 pgvector>=0.3
 

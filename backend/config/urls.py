@@ -26,9 +26,8 @@ api_v1_patterns = [
     path("hardware/", include("apps.hardware.urls")),
     path("presets/", include("apps.presets.urls")),
     path("analysis/", include("apps.analysis.urls")),
-    path("agents/", include("apps.agents.urls")),
+    path("agents/", include("apps.agents_app.urls")),
     path("notifications/", include("apps.notifications.urls")),
-    path("chat/", include("apps.chat.urls")),
     # JWT authentication
     path("auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
