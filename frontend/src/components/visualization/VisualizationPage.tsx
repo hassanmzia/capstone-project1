@@ -34,6 +34,7 @@ import FFTDisplay from "./FFTDisplay";
 import SpectrogramDisplay from "./SpectrogramDisplay";
 import PCBDataDisplay from "./PCBDataDisplay";
 import TelemetryPanel from "./TelemetryPanel";
+import RasterDisplay from "./RasterDisplay";
 
 // Icons
 import {
@@ -306,7 +307,10 @@ export default function VisualizationPage() {
 
         {/* ─── Main Display Area ─── */}
         <div className="min-h-0 min-w-0" style={{ gridRow: "2 / 3" }}>
-          <WaveformDisplay className="h-full" />
+          {viz.displayMode === "waveform" && <WaveformDisplay className="h-full" />}
+          {viz.displayMode === "heatmap" && <SpikeHeatmap className="h-full" />}
+          {viz.displayMode === "raster" && <RasterDisplay className="h-full" />}
+          {viz.displayMode === "spectrum" && <SpectrogramDisplay className="h-full" />}
         </div>
 
         {/* ─── Right Panel: Heatmap / Electrode Array / Telemetry ─── */}
