@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import {
   BarChart3,
   Play,
@@ -28,6 +29,26 @@ const analysisTypes = [
 ];
 
 export default function AnalysisPage() {
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [jobs, setJobs] = useState(analysisJobs);
+
+  const handleNewAnalysis = useCallback(() => {
+    const typeName = selectedType || "Spike Sorting";
+    const id = `a-${String(jobs.length + 1).padStart(3, "0")}`;
+    setJobs((prev) => [
+      {
+        id,
+        type: typeName,
+        recording: `session_${String(42 + prev.length).padStart(3, "0")}`,
+        status: "queued",
+        progress: 0,
+        duration: "--",
+        result: "",
+      },
+      ...prev,
+    ]);
+  }, [selectedType, jobs.length]);
+
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Header */}
@@ -36,7 +57,10 @@ export default function AnalysisPage() {
           <BarChart3 className="w-5 h-5 text-neural-accent-green" />
           <h1 className="text-lg font-semibold text-neural-text-primary">Analysis</h1>
         </div>
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-green/20 text-neural-accent-green hover:bg-neural-accent-green/30 border border-neural-accent-green/30 neural-transition">
+        <button
+          onClick={handleNewAnalysis}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-green/20 text-neural-accent-green hover:bg-neural-accent-green/30 border border-neural-accent-green/30 neural-transition"
+        >
           <Play className="w-4 h-4" />
           New Analysis
         </button>
@@ -52,7 +76,12 @@ export default function AnalysisPage() {
             {analysisTypes.map((at) => (
               <button
                 key={at.name}
-                className="flex items-start gap-3 w-full p-3 rounded-lg bg-neural-surface-alt hover:bg-neural-border neural-transition text-left border border-neural-border hover:border-neural-border-bright"
+                onClick={() => setSelectedType(at.name)}
+                className={`flex items-start gap-3 w-full p-3 rounded-lg neural-transition text-left border ${
+                  selectedType === at.name
+                    ? "bg-neural-accent-cyan/10 border-neural-accent-cyan/40"
+                    : "bg-neural-surface-alt hover:bg-neural-border border-neural-border hover:border-neural-border-bright"
+                }`}
               >
                 <at.icon className={`w-5 h-5 mt-0.5 ${at.color} shrink-0`} />
                 <div>
@@ -70,7 +99,7 @@ export default function AnalysisPage() {
             Analysis Jobs
           </h2>
           <div className="space-y-3">
-            {analysisJobs.map((job) => (
+            {jobs.map((job) => (
               <div
                 key={job.id}
                 className="p-4 rounded-lg bg-neural-surface-alt border border-neural-border"
