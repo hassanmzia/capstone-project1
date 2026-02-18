@@ -1669,17 +1669,249 @@ HOST_IP=172.168.1.95
 
 ---
 
-## 14. SECURITY CONSIDERATIONS
+## 14. GUARDRAILS (7 Layers)
 
-- JWT-based authentication with refresh tokens
-- Role-based access control (Admin, Researcher, Viewer)
-- API rate limiting per user/role
-- Input validation on all endpoints
-- CORS configuration restricted to known origins
-- Database connection pooling with SSL
-- Secrets managed via environment variables (never in code)
-- Audit logging of all configuration changes
-- Network isolation via Docker Compose internal network
+### Layer Summary
+```
+┌─────────────────────────────────────────────────┐
+│  Layer 7: Compliance & Regulatory               │
+├─────────────────────────────────────────────────┤
+│  Layer 6: LLM Operational (tool tiers, LangFuse)│
+├─────────────────────────────────────────────────┤
+│  Layer 5: Access & Authentication (RBAC, JWT)   │
+├─────────────────────────────────────────────────┤
+│  Layer 4: System & Infrastructure (watchdog)    │
+├─────────────────────────────────────────────────┤
+│  Layer 3: Data Integrity (sequence, CRC, loss)  │
+├─────────────────────────────────────────────────┤
+│  Layer 2: Hardware Safety (voltage, thermal)    │  ← MOST CRITICAL
+├─────────────────────────────────────────────────┤
+│  Layer 1: LLM I/O (injection, hallucination)    │
+└─────────────────────────────────────────────────┘
+```
+
+### 14.1 Layer 1 — LLM Input/Output Guardrails
+
+**Input Guardrails:**
+| Guardrail | Implementation | Why |
+|-----------|---------------|-----|
+| **Prompt Injection Detection** | LangGraph pre-processing node scans input for injection patterns | Prevents adversarial bypass |
+| **Input Sanitization** | Strip/escape special tokens, system prompt markers, role overrides | Stops prompt manipulation |
+| **Context Length Limiter** | Truncate/summarize approaching DeepSeek-R1 context window | Prevents degraded reasoning |
+| **Rate Limiting** | Max 20 LLM calls/min per user, max 5 tool calls per turn | Prevents runaway loops |
+
+**Output Guardrails:**
+| Guardrail | Implementation | Why |
+|-----------|---------------|-----|
+| **Tool Call Validation** | Every MCP tool call validated against parameter schemas BEFORE execution | LLM can hallucinate params |
+| **Hallucination Detection** | Cross-check claims against actual DB records (RAG grounding score) | Prevents fabricated results |
+| **Confidence Thresholding** | RAG similarity < 0.7 → LLM says "I don't have enough data" | Prevents confident wrong answers |
+| **Response Filtering** | Post-processing check for contradictions, impossible values | Catches errors before user |
+| **Citation Requirement** | Data answers must cite source experiment/recording IDs | Enables verification |
+
+**Agent Loop Guardrails:**
+```
+User Input
+    │
+    ▼
+[Injection Detection] ──X── Block if suspicious
+    │
+    ▼
+[Intent Router] ───► LLM reasoning
+    │
+    ▼
+[Tool Call Validator] ──X── Reject invalid params
+    │
+    ▼
+[Safety Check] ──X── Block unsafe hardware commands
+    │
+    ▼
+[Human-in-the-Loop] ── Require approval for dangerous ops
+    │
+    ▼
+[Execute Tool] ───► Actual MCP tool call
+    │
+    ▼
+[Output Validator] ──X── Filter hallucinations
+    │
+    ▼
+[Max Iterations: 10] ──X── Kill runaway loops
+    │
+    ▼
+Response to User
+```
+
+### 14.2 Layer 2 — Hardware Safety Guardrails (MOST CRITICAL)
+
+Wrong stimulation parameters can damage neural tissue. These limits are hard-coded and cannot be overridden by LLM or API.
+
+**Safety Limits:**
+```python
+HARDWARE_SAFETY_LIMITS = {
+    "vs_max_voltage": 3.6,              # Absolute max VS output (V)
+    "vs_min_voltage": 0.0,              # Min VS output (V)
+    "stim_max_current_ua": 500,         # Max stimulation current (µA)
+    "stim_max_charge_per_phase_nc": 100, # Max charge per phase (nC)
+    "bias_limits": {                     # Per-parameter min/max for all 20 bias values
+        "BP_OTA": {"min": 0.0, "max": 3.3, "unit": "V"},
+        "BP_CI":  {"min": 0.0, "max": 3.3, "unit": "V"},
+        # ... all 20 parameters
+    },
+    "max_stim_frequency_hz": 200000,
+    "min_stim_frequency_hz": 0.1,
+    "max_waveform_points": 2048,
+    "max_waveform_amplitude_v": 3.6,
+    "max_pcb_temperature_c": 45.0,       # Auto-shutdown above this
+    "max_ic_temperature_c": 42.0,        # Tissue-safe limit
+}
+```
+
+**Hardware Command Validation Flow:**
+```
+Any Hardware Command (from UI, API, or LLM)
+    │
+    ▼
+Parameter Range Validator → Reject out-of-range immediately
+    │
+    ▼
+Charge Balance Check → Verify biphasic balance, max charge ≤ 100 nC
+    │
+    ▼
+Rate-of-Change Limiter → No sudden jumps > 0.5V/step, ramp gradually
+    │
+    ▼
+Thermal Watchdog → Auto-reduce if T>40°C, emergency shutdown if T>45°C
+    │
+    ▼
+Execute on FPGA
+```
+
+**Human-in-the-Loop Required Operations (even from LLM):**
+- Start/stop stimulation
+- Change stimulation amplitude > 10% of current value
+- Upload new waveform to FPGA
+- Change gain mode during active recording
+- Flash new FPGA bitstream
+- Delete any recording data
+- Change electrode configuration during recording
+
+### 14.3 Layer 3 — Data Integrity Guardrails
+
+| Guardrail | Implementation | Trigger |
+|-----------|---------------|---------|
+| **Packet Sequence Validation** | Check sequence numbers for gaps | Every data chunk |
+| **CRC Verification** | Validate packet checksums | Every data chunk |
+| **Buffer Overflow Detection** | Monitor ring buffer fill level | Continuous (< 2ms) |
+| **Data Loss Counter** | Track packets_received vs packets_expected | Per recording |
+| **Auto Recording Pause** | Pause if packet loss > 0.1% sustained | Alert + auto-action |
+| **HDF5 Write Verification** | Verify written data matches source | Every flush |
+| **Disk Space Watchdog** | Alert at 90%, pause recording at 95% | Every 10 sec |
+| **File Size Limiter** | Split recordings at configurable max (e.g. 10 GB) | Per recording |
+
+### 14.4 Layer 4 — System & Infrastructure Guardrails
+
+**Agent Watchdog (runs in Orchestrator):**
+```
+Every 5 seconds:
+├── Ping all 8 agents via /health endpoint
+├── Check response time < 2 sec
+├── If agent unresponsive for 3 checks:
+│   ├── Log critical alert
+│   ├── Notify via Notification Agent
+│   ├── Auto-restart container (Docker restart)
+│   └── If recording active:
+│       ├── Data Acq Agent down → PAUSE recording
+│       ├── Storage Agent down → buffer to Redis
+│       └── Other agents → continue with degraded mode
+└── Track uptime metrics in telemetry table
+```
+
+**Resource Limits:**
+| Resource | Limit | Action on Breach |
+|----------|-------|-----------------|
+| CPU per agent container | 2 cores max | Docker cgroup limit |
+| Memory per agent | 2 GB max (Acq: 4 GB) | OOM kill + auto-restart |
+| Redis memory | 512 MB | LRU eviction policy |
+| PostgreSQL connections | Pool of 20 per service | Queue overflow requests |
+| WebSocket connections | 50 per user | Reject new connections |
+| API rate limit | 100 req/sec per user | HTTP 429 response |
+| File upload size | 50 MB max | Reject at nginx |
+| LLM response timeout | 30 sec max | Kill and return error |
+
+**Circuit Breakers:**
+If an agent fails 5 times in 60 seconds → circuit opens → all calls return immediate error → 30 sec cooldown → test call → close if success.
+
+### 14.5 Layer 5 — Access & Authentication Guardrails
+
+| Guardrail | Implementation |
+|-----------|---------------|
+| **JWT Token Expiry** | Access: 15 min, Refresh: 7 days |
+| **Role-Based Access Control** | Admin > Researcher > Viewer |
+| **Session Timeout** | Auto-logout after 30 min inactivity |
+| **Concurrent Session Limit** | Max 3 sessions per user |
+| **IP Allowlisting** | Optional — restrict to lab network |
+| **Audit Log** | Every action logged with user, timestamp, IP |
+| **Failed Login Lockout** | 5 failed attempts → 15 min lockout |
+
+**Permission Matrix:**
+| Operation | Admin | Researcher | Viewer |
+|-----------|-------|-----------|--------|
+| View live data | Yes | Yes | Yes |
+| Start/stop recording | Yes | Yes | No |
+| Change hardware config | Yes | Yes | No |
+| Start stimulation | Yes | Yes | No |
+| Delete recordings | Yes | No | No |
+| Manage users | Yes | No | No |
+| Flash FPGA firmware | Yes | No | No |
+| Use LLM chat | Yes | Yes | Yes (read-only tools) |
+| Export data | Yes | Yes | No |
+
+### 14.6 Layer 6 — LLM Operational Guardrails
+
+**Tool Permission Tiers for LLM:**
+```python
+LLM_TOOL_TIERS = {
+    "read_only": [
+        # LLM can call freely — no confirmation needed
+        "get_stream_status", "get_device_info", "get_signal_quality",
+        "query_recordings", "get_recording_metadata", "get_system_health",
+        "compute_statistics", "compute_fft", "query_knowledge",
+    ],
+    "requires_confirmation": [
+        # LLM proposes, user must click "Approve" in chat UI
+        "start_recording", "stop_recording", "configure_bias",
+        "set_clocks", "set_gain_mode", "configure_tia",
+        "configure_pixels", "filter_signal", "reduce_noise", "export_data",
+    ],
+    "blocked": [
+        # LLM can NEVER call — must use manual UI controls
+        "set_stimulation", "trigger_stimulation", "upload_waveform",
+        "flash_firmware", "delete_recording", "manage_users",
+    ],
+}
+```
+
+**LLM Monitoring (via LangFuse):**
+| Metric | Alert Threshold | Action |
+|--------|----------------|--------|
+| Token usage/hour | > 50,000 tokens | Rate limit user |
+| Tool call failures | > 5 in 10 min | Investigate prompt |
+| Hallucination score | < 0.7 grounding | Add "low confidence" warning |
+| Response latency | > 10 sec | Scale or switch model |
+| Conversation loops | Same tool > 3x | Force break loop |
+| Unsafe content | Any detected | Block + log + alert admin |
+
+### 14.7 Layer 7 — Compliance & Regulatory Guardrails
+
+| Guardrail | Purpose |
+|-----------|---------|
+| **Data Retention Policy** | Configurable auto-archive/delete after N days |
+| **Anonymization** | Strip PII from exported data if configured |
+| **Experiment Audit Trail** | Immutable log of all parameter changes during recording |
+| **Configuration Versioning** | Every config change creates a versioned snapshot |
+| **Data Export Compliance** | NWB format includes required metadata fields |
+| **Consent Tracking** | Optional field for IRB/ethics approval numbers |
+| **Access Audit Report** | Generate who-accessed-what reports for compliance |
 
 ---
 
