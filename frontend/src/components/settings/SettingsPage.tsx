@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Settings,
   HardDrive,
@@ -299,6 +300,7 @@ function saveUsers(users: UserEntry[]) {
 const LOG_LEVELS: AgentConfig["logLevel"][] = ["debug", "info", "warn", "error"];
 
 export default function SettingsPage() {
+  const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<SettingsTab>("presets");
   const [presets, setPresets] = useState<Preset[]>(loadPresets);
   const [users, setUsers] = useState<UserEntry[]>(loadUsers);
@@ -529,9 +531,20 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Header */}
-      <div className="flex items-center gap-2 bg-neural-surface rounded-xl border border-neural-border p-3">
-        <Settings className="w-5 h-5 text-neural-text-muted" />
-        <h1 className="text-lg font-semibold text-neural-text-primary">Settings</h1>
+      <div className="flex items-center justify-between bg-neural-surface rounded-xl border border-neural-border p-3">
+        <div className="flex items-center gap-2">
+          <Settings className="w-5 h-5 text-neural-text-muted" />
+          <h1 className="text-lg font-semibold text-neural-text-primary">Settings</h1>
+        </div>
+        {currentUser && (
+          <div className="flex items-center gap-2 text-xs text-neural-text-muted">
+            <span>Signed in as</span>
+            <span className="font-medium text-neural-text-secondary">{currentUser.name}</span>
+            <span className="px-1.5 py-0.5 rounded bg-neural-border/60 text-neural-text-secondary font-medium">
+              {currentUser.role}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
@@ -1061,6 +1074,11 @@ export default function SettingsPage() {
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm font-medium text-neural-text-primary">{user.name || "Unnamed"}</span>
+                                  {currentUser && user.email === currentUser.email && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-neural-accent-green/20 text-neural-accent-green">
+                                      You
+                                    </span>
+                                  )}
                                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                                     user.role === "Admin"
                                       ? "bg-neural-accent-purple/20 text-neural-accent-purple"
