@@ -67,6 +67,7 @@ export function useWebSocket({
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const wsUrl = url.startsWith("ws") ? url : `${protocol}//${window.location.host}${url}`;
       const ws = new WebSocket(wsUrl);
+      ws.binaryType = "arraybuffer";
 
       ws.onopen = (event) => {
         setIsConnected(true);

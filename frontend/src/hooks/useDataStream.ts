@@ -97,6 +97,7 @@ export function useDataStream(config: DataStreamConfig = {}): DataStreamReturn {
   const sampleCountRef = useRef(0);
   const lastRateUpdateRef = useRef(Date.now());
   const lastSequenceRef = useRef(-1);
+  const hasReceivedDataRef = useRef(false);
 
   // Initialize ring buffer
   useEffect(() => {
@@ -117,6 +118,7 @@ export function useDataStream(config: DataStreamConfig = {}): DataStreamReturn {
 
       // Handle binary data (ArrayBuffer) for waveform samples
       if (rawData instanceof ArrayBuffer) {
+        hasReceivedDataRef.current = true;
         decodeBinaryData(rawData, rb);
         return;
       }
@@ -125,6 +127,7 @@ export function useDataStream(config: DataStreamConfig = {}): DataStreamReturn {
       const data = rawData as Record<string, unknown>;
 
       if (data.type === "neural_samples" && data.channels) {
+        hasReceivedDataRef.current = true;
         const channelsObj = data.channels as Record<string, number[]>;
         const channelArrays: Float32Array[] = [];
 
@@ -207,62 +210,76 @@ export function useDataStream(config: DataStreamConfig = {}): DataStreamReturn {
   const mockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mockStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Start mock data generation after 3 seconds without connection
+  // Start mock data if: (a) not connected after 3s, or (b) connected but no data after 5s
+  const startMockData = useCallback(() => {
+    if (mockTimerRef.current) return; // Already running
+
+    setIsConnected(true); // Indicate data is flowing (demo mode)
+    mockBatchIndexRef.current = 0;
+
+    mockTimerRef.current = setInterval(() => {
+      const rb = ringBufferRef.current;
+      if (!rb) return;
+
+      const batch = generateMockBatch(channelCount, mockBatchIndexRef.current);
+      rb.push(batch);
+      mockBatchIndexRef.current++;
+
+      // Update rate/fill stats
+      sampleCountRef.current += MOCK_BATCH_SIZE;
+      setPacketCount((prev) => prev + 1);
+
+      const now = Date.now();
+      if (now - lastRateUpdateRef.current > 1000) {
+        const elapsed = (now - lastRateUpdateRef.current) / 1000;
+        setDataRate(Math.round(sampleCountRef.current / elapsed));
+        sampleCountRef.current = 0;
+        lastRateUpdateRef.current = now;
+      }
+      setBufferFill(rb.getFillLevel(0));
+    }, 50); // 50ms interval = 20 batches/sec
+  }, [channelCount]);
+
+  const stopMockData = useCallback(() => {
+    if (mockTimerRef.current) {
+      clearInterval(mockTimerRef.current);
+      mockTimerRef.current = null;
+    }
+    if (mockStartTimerRef.current) {
+      clearTimeout(mockStartTimerRef.current);
+      mockStartTimerRef.current = null;
+    }
+  }, []);
+
+  // Fallback (a): no connection after 3 seconds
   useEffect(() => {
     if (wsConnected) {
-      // Real connection: stop mock if running
-      if (mockTimerRef.current) {
-        clearInterval(mockTimerRef.current);
-        mockTimerRef.current = null;
-      }
-      if (mockStartTimerRef.current) {
-        clearTimeout(mockStartTimerRef.current);
-        mockStartTimerRef.current = null;
-      }
+      stopMockData();
       return;
     }
 
-    // Wait 3 seconds before starting mock data
     mockStartTimerRef.current = setTimeout(() => {
-      if (mockTimerRef.current) return; // Already running
-
-      setIsConnected(true); // Indicate data is flowing (demo mode)
-      mockBatchIndexRef.current = 0;
-
-      mockTimerRef.current = setInterval(() => {
-        const rb = ringBufferRef.current;
-        if (!rb) return;
-
-        const batch = generateMockBatch(channelCount, mockBatchIndexRef.current);
-        rb.push(batch);
-        mockBatchIndexRef.current++;
-
-        // Update rate/fill stats
-        sampleCountRef.current += MOCK_BATCH_SIZE;
-        setPacketCount((prev) => prev + 1);
-
-        const now = Date.now();
-        if (now - lastRateUpdateRef.current > 1000) {
-          const elapsed = (now - lastRateUpdateRef.current) / 1000;
-          setDataRate(Math.round(sampleCountRef.current / elapsed));
-          sampleCountRef.current = 0;
-          lastRateUpdateRef.current = now;
-        }
-        setBufferFill(rb.getFillLevel(0));
-      }, 50); // 50ms interval = 20 batches/sec
+      startMockData();
     }, 3000);
 
-    return () => {
-      if (mockTimerRef.current) {
-        clearInterval(mockTimerRef.current);
-        mockTimerRef.current = null;
+    return stopMockData;
+  }, [wsConnected, startMockData, stopMockData]);
+
+  // Fallback (b): connected but no data received after 5 seconds
+  useEffect(() => {
+    if (!wsConnected) return;
+
+    // Reset flag when connection is (re-)established
+    hasReceivedDataRef.current = false;
+
+    const noDataTimer = setTimeout(() => {
+      if (!hasReceivedDataRef.current && !mockTimerRef.current) {
+        startMockData();
       }
-      if (mockStartTimerRef.current) {
-        clearTimeout(mockStartTimerRef.current);
-        mockStartTimerRef.current = null;
-      }
-    };
-  }, [wsConnected, channelCount]);
+    }, 5000);
+
+    return () => clearTimeout(noDataTimer);
+  }, [wsConnected, startMockData]);
 
   const getLatestData = useCallback(
     (channelIndex: number, length: number): Float32Array => {
