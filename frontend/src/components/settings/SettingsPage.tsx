@@ -115,15 +115,43 @@ function loadAgentConfigs(): AgentConfig[] {
   return DEFAULT_AGENTS.map((a) => ({ ...a }));
 }
 
-/* ── Mock data ── */
-const mockPresets = [
+/* ── Preset shape ── */
+interface Preset {
+  id: string;
+  name: string;
+  description: string;
+  isDefault: boolean;
+  createdBy: string;
+}
+
+const DEFAULT_PRESETS: Preset[] = [
   { id: "p-1", name: "Default", description: "Standard 30kHz recording configuration", isDefault: true, createdBy: "System" },
   { id: "p-2", name: "High Density", description: "64x64 full array, high gain, reduced bandwidth", isDefault: false, createdBy: "Dr. Chen" },
   { id: "p-3", name: "Low Noise", description: "Optimized for low-noise cortical recordings", isDefault: false, createdBy: "Dr. Patel" },
   { id: "p-4", name: "Stimulation", description: "Closed-loop stimulation with biphasic pulses", isDefault: false, createdBy: "Dr. Kim" },
 ];
 
-const mockUsers = [
+function loadPresets(): Preset[] {
+  try {
+    const raw = localStorage.getItem("cnea_presets");
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return DEFAULT_PRESETS.map((p) => ({ ...p }));
+}
+
+function savePresets(presets: Preset[]) {
+  localStorage.setItem("cnea_presets", JSON.stringify(presets));
+}
+
+/* ── User shape ── */
+interface UserEntry {
+  name: string;
+  role: string;
+  email: string;
+  lastActive: string;
+}
+
+const DEFAULT_USERS: UserEntry[] = [
   { name: "Dr. Chen", role: "Admin", email: "chen@lab.edu", lastActive: "2 min ago" },
   { name: "Dr. Patel", role: "Researcher", email: "patel@lab.edu", lastActive: "1 hr ago" },
   { name: "Dr. Kim", role: "Researcher", email: "kim@lab.edu", lastActive: "3 hr ago" },
@@ -131,12 +159,27 @@ const mockUsers = [
   { name: "Lab Tech", role: "Operator", email: "tech@lab.edu", lastActive: "5 hr ago" },
 ];
 
+function loadUsers(): UserEntry[] {
+  try {
+    const raw = localStorage.getItem("cnea_users");
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return DEFAULT_USERS.map((u) => ({ ...u }));
+}
+
+function saveUsers(users: UserEntry[]) {
+  localStorage.setItem("cnea_users", JSON.stringify(users));
+}
+
 const LOG_LEVELS: AgentConfig["logLevel"][] = ["debug", "info", "warn", "error"];
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("presets");
-  const [presets, setPresets] = useState(mockPresets);
-  const [users, setUsers] = useState(mockUsers);
+  const [presets, setPresets] = useState<Preset[]>(loadPresets);
+  const [users, setUsers] = useState<UserEntry[]>(loadUsers);
+  const [editingPreset, setEditingPreset] = useState<string | null>(null);
+  const [presetDraft, setPresetDraft] = useState<Preset | null>(null);
+  const [presetSaved, setPresetSaved] = useState<string | null>(null);
 
   /* ── LLM state ── */
   const [llm, setLlm] = useState<LLMSettings>(loadLLMSettings);
@@ -193,22 +236,72 @@ export default function SettingsPage() {
 
   /* ── Presets ── */
   const handleNewPreset = useCallback(() => {
-    const id = `p-${presets.length + 1}`;
-    setPresets((prev) => [
-      ...prev,
-      { id, name: `Custom Preset ${prev.length + 1}`, description: "New custom configuration", isDefault: false, createdBy: "Researcher" },
-    ]);
-  }, [presets.length]);
+    setPresets((prev) => {
+      const id = `p-${Date.now()}`;
+      const updated = [
+        ...prev,
+        { id, name: `Custom Preset ${prev.length + 1}`, description: "New custom configuration", isDefault: false, createdBy: "Researcher" },
+      ];
+      savePresets(updated);
+      // Start editing the new preset immediately
+      setEditingPreset(id);
+      setPresetDraft(updated[updated.length - 1]);
+      return updated;
+    });
+  }, []);
 
   const handleDeletePreset = useCallback((id: string) => {
-    setPresets((prev) => prev.filter((p) => p.id !== id));
+    setPresets((prev) => {
+      const updated = prev.filter((p) => p.id !== id);
+      savePresets(updated);
+      return updated;
+    });
+    if (editingPreset === id) {
+      setEditingPreset(null);
+      setPresetDraft(null);
+    }
+  }, [editingPreset]);
+
+  const handleEditPreset = useCallback((preset: Preset) => {
+    setEditingPreset(preset.id);
+    setPresetDraft({ ...preset });
+  }, []);
+
+  const handleSavePreset = useCallback(() => {
+    if (!presetDraft) return;
+    setPresets((prev) => {
+      const updated = prev.map((p) => (p.id === presetDraft.id ? { ...presetDraft } : p));
+      savePresets(updated);
+      return updated;
+    });
+    setPresetSaved(presetDraft.id);
+    setTimeout(() => setPresetSaved(null), 2000);
+    setEditingPreset(null);
+    setPresetDraft(null);
+  }, [presetDraft]);
+
+  const handleCancelPreset = useCallback(() => {
+    setEditingPreset(null);
+    setPresetDraft(null);
+  }, []);
+
+  const handleSetDefault = useCallback((id: string) => {
+    setPresets((prev) => {
+      const updated = prev.map((p) => ({ ...p, isDefault: p.id === id }));
+      savePresets(updated);
+      return updated;
+    });
   }, []);
 
   const handleAddUser = useCallback(() => {
-    setUsers((prev) => [
-      ...prev,
-      { name: `New User ${prev.length + 1}`, role: "Researcher", email: `user${prev.length + 1}@lab.edu`, lastActive: "just now" },
-    ]);
+    setUsers((prev) => {
+      const updated = [
+        ...prev,
+        { name: `New User ${prev.length + 1}`, role: "Researcher", email: `user${prev.length + 1}@lab.edu`, lastActive: "just now" },
+      ];
+      saveUsers(updated);
+      return updated;
+    });
   }, []);
 
   const currentProvider = useMemo(
@@ -267,42 +360,120 @@ export default function SettingsPage() {
               </div>
 
               <div className="space-y-3">
-                {presets.map((preset) => (
-                  <div
-                    key={preset.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg bg-neural-surface-alt border border-neural-border"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-neural-text-primary">{preset.name}</span>
-                        {preset.isDefault && (
-                          <span className="px-1.5 py-0.5 rounded text-xs bg-neural-accent-green/20 text-neural-accent-green">
-                            Default
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-neural-text-muted mt-1">{preset.description}</p>
-                      <p className="text-xs text-neural-text-muted mt-0.5">Created by: {preset.createdBy}</p>
+                {presets.map((preset) => {
+                  const isEditing = editingPreset === preset.id;
+                  const draft = isEditing ? presetDraft! : preset;
+                  const justSaved = presetSaved === preset.id;
+
+                  return (
+                    <div
+                      key={preset.id}
+                      className={`p-4 rounded-lg border neural-transition ${
+                        isEditing
+                          ? "bg-neural-surface-alt border-neural-accent-cyan/40"
+                          : justSaved
+                          ? "bg-neural-surface-alt border-neural-accent-green/40"
+                          : "bg-neural-surface-alt border-neural-border"
+                      }`}
+                    >
+                      {isEditing ? (
+                        /* ── Inline editing mode ── */
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-xs text-neural-text-muted">Name</label>
+                              <input
+                                type="text"
+                                value={draft.name}
+                                onChange={(e) => setPresetDraft((d) => d ? { ...d, name: e.target.value } : d)}
+                                className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary"
+                                autoFocus
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-neural-text-muted">Created by</label>
+                              <input
+                                type="text"
+                                value={draft.createdBy}
+                                onChange={(e) => setPresetDraft((d) => d ? { ...d, createdBy: e.target.value } : d)}
+                                className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-neural-text-muted">Description</label>
+                            <input
+                              type="text"
+                              value={draft.description}
+                              onChange={(e) => setPresetDraft((d) => d ? { ...d, description: e.target.value } : d)}
+                              className="mt-1 w-full bg-neural-surface border border-neural-border rounded-lg px-3 py-1.5 text-sm text-neural-text-primary"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              onClick={handleSavePreset}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs bg-neural-accent-green/20 text-neural-accent-green hover:bg-neural-accent-green/30 border border-neural-accent-green/30 neural-transition"
+                            >
+                              <Check className="w-3 h-3" /> Save
+                            </button>
+                            <button
+                              onClick={handleCancelPreset}
+                              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs text-neural-text-muted hover:text-neural-text-primary hover:bg-neural-border neural-transition"
+                            >
+                              <X className="w-3 h-3" /> Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* ── Display mode ── */
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-neural-text-primary">{preset.name}</span>
+                              {preset.isDefault && (
+                                <span className="px-1.5 py-0.5 rounded text-xs bg-neural-accent-green/20 text-neural-accent-green">
+                                  Default
+                                </span>
+                              )}
+                              {justSaved && (
+                                <span className="flex items-center gap-1 text-xs text-neural-accent-green">
+                                  <Check className="w-3 h-3" /> Saved
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-neural-text-muted mt-1">{preset.description}</p>
+                            <p className="text-xs text-neural-text-muted mt-0.5">Created by: {preset.createdBy}</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {!preset.isDefault && (
+                              <button
+                                onClick={() => handleSetDefault(preset.id)}
+                                title="Set as default"
+                                className="px-2 py-1.5 rounded-lg text-xs text-neural-text-muted hover:text-neural-accent-green hover:bg-neural-accent-green/10 neural-transition"
+                              >
+                                Set Default
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleEditPreset(preset)}
+                              title="Edit preset"
+                              className="p-2 rounded-lg hover:bg-neural-border text-neural-text-muted hover:text-neural-text-primary neural-transition"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeletePreset(preset.id)}
+                              title="Delete preset"
+                              className="p-2 rounded-lg hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-red neural-transition"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          const newName = prompt("Preset name:", preset.name);
-                          if (newName) setPresets((prev) => prev.map((p) => p.id === preset.id ? { ...p, name: newName } : p));
-                        }}
-                        className="p-2 rounded-lg hover:bg-neural-border text-neural-text-muted hover:text-neural-text-primary neural-transition"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeletePreset(preset.id)}
-                        className="p-2 rounded-lg hover:bg-neural-border text-neural-text-muted hover:text-neural-accent-red neural-transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
