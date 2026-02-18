@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
-import { useSpikeEvents } from "@/hooks/useSpikeEvents";
+import { useSharedSpikeEvents } from "@/contexts/SpikeEventsContext";
 import { neuralActivity, createCSSGradient, type ColormapFn, COLORMAPS, buildLUT } from "@/utils/colorMaps";
 import { siteToRowCol, rowColToSite, getSiteLabel } from "@/utils/siteConversion";
 
@@ -47,9 +47,7 @@ export default function SpikeHeatmap({
   const [selectedSites, setSelectedSites] = useState<Set<number>>(new Set());
   const [scaleType, setScaleType] = useState<"linear" | "log">(colorScale);
 
-  const { spikeRate, spikeCounts, activeSites } = useSpikeEvents({
-    totalSites: gridSize * gridSize,
-  });
+  const { spikeRate, spikeCounts, activeSites } = useSharedSpikeEvents();
 
   const colormap: ColormapFn = useMemo(
     () => COLORMAPS[colormapName] ?? neuralActivity,

@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
-import { useDataStream } from "@/hooks/useDataStream";
+import { useNeuralData } from "@/contexts/NeuralDataContext";
 
 interface FFTDisplayProps {
   className?: string;
@@ -42,7 +42,7 @@ export default function FFTDisplay({
   const [maxFrequency, setMaxFrequency] = useState(propMaxFreq ?? sampleRate / 2);
   const [peakFreqs, setPeakFreqs] = useState<Map<number, number>>(new Map());
 
-  const { getLatestData } = useDataStream({ channelCount: 64, targetFps: 30 });
+  const { getLatestData } = useNeuralData();
 
   const nyquist = sampleRate / 2;
 

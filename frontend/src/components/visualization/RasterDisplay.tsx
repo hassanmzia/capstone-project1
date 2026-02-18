@@ -7,7 +7,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
-import { useSpikeEvents } from "@/hooks/useSpikeEvents";
+import { useSharedSpikeEvents } from "@/contexts/SpikeEventsContext";
 
 interface RasterDisplayProps {
   className?: string;
@@ -30,7 +30,7 @@ export default function RasterDisplay({
   const animFrameRef = useRef<number>(0);
 
   const viz = useSelector((state: RootState) => state.visualization);
-  const { latestSpikes, isConnected } = useSpikeEvents();
+  const { latestSpikes, isConnected } = useSharedSpikeEvents();
   const prevSpikeLenRef = useRef(0);
 
   const [windowSec] = useState(10);
