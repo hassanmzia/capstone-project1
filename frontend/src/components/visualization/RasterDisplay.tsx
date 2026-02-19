@@ -8,6 +8,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import { useSharedSpikeEvents } from "@/contexts/SpikeEventsContext";
+import { computeCanvasMetrics } from "@/utils/canvasScale";
 
 interface RasterDisplayProps {
   className?: string;
@@ -61,9 +62,10 @@ export default function RasterDisplay({
     if (!canvas || !container) return;
 
     const rect = container.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    const metrics = computeCanvasMetrics(rect.width, rect.height);
+    const dpr = metrics.dpr;
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
     canvas.style.width = `${rect.width}px`;
     canvas.style.height = `${rect.height}px`;
 
@@ -73,11 +75,9 @@ export default function RasterDisplay({
 
     const W = rect.width;
     const H = rect.height;
-    const marginLeft = 50;
-    const marginBottom = 28;
-    const marginTop = 8;
-    const plotW = W - marginLeft;
-    const plotH = H - marginBottom - marginTop;
+    const { margin: mg, plotW, plotH, fonts } = metrics;
+    const marginLeft = mg.left;
+    const marginTop = mg.top;
 
     // Background
     ctx.fillStyle = "#0f1729";
@@ -111,7 +111,7 @@ export default function RasterDisplay({
     // Time grid
     const secStep = windowSec <= 5 ? 1 : windowSec <= 20 ? 2 : 5;
     ctx.fillStyle = "rgba(148, 163, 184, 0.4)";
-    ctx.font = "10px monospace";
+    ctx.font = fonts.tickLabel;
     ctx.textAlign = "center";
     for (let t = Math.ceil(tMin / secStep) * secStep; t <= tMax; t += secStep) {
       const x = marginLeft + ((t - tMin) / (tMax - tMin)) * plotW;
@@ -124,7 +124,7 @@ export default function RasterDisplay({
 
     // Channel labels
     ctx.fillStyle = "rgba(148, 163, 184, 0.6)";
-    ctx.font = "9px monospace";
+    ctx.font = fonts.annotation;
     ctx.textAlign = "right";
     for (let i = 0; i < numCh; i++) {
       const y = marginTop + i * chHeight + chHeight / 2 + 3;

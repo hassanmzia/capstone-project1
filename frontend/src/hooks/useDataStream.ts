@@ -112,6 +112,10 @@ export function useDataStream(config: DataStreamConfig = {}): DataStreamReturn {
   const lastSequenceRef = useRef(-1);
   const hasReceivedDataRef = useRef(false);
 
+  // Frame-skip: track how many frames we skipped due to high buffer fill
+  const skipCountRef = useRef(0);
+  const BUFFER_HIGH_WATERMARK = 0.85; // Skip pushes above 85% fill
+
   // Initialize ring buffer
   useEffect(() => {
     ringBufferRef.current = new ClientRingBuffer(channelCount, samplesPerChannel);
@@ -141,6 +145,20 @@ export function useDataStream(config: DataStreamConfig = {}): DataStreamReturn {
 
       if (data.type === "neural_samples" && data.channels) {
         hasReceivedDataRef.current = true;
+
+        // Frame-skip: if ring buffer fill exceeds high watermark, drop this
+        // batch to let rendering catch up and prevent data congestion.
+        const fillLevel = rb.getFillLevel(0);
+        if (fillLevel > BUFFER_HIGH_WATERMARK) {
+          skipCountRef.current++;
+          // Still track rate and packet for monitoring, but skip the push
+          const samplesThisBatch = Object.values(data.channels as Record<string, number[]>)[0]?.length ?? 0;
+          sampleCountRef.current += samplesThisBatch;
+          setPacketCount((prev) => prev + 1);
+          setDroppedPackets((prev) => prev + 1);
+          return;
+        }
+
         const channelsObj = data.channels as Record<string, number[]>;
         const channelArrays: Float32Array[] = [];
 

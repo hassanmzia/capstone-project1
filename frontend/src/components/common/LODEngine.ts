@@ -2,7 +2,53 @@
  * Level-of-Detail decimation engine for efficient waveform rendering.
  * Provides min/max decimation for vertical span rendering and
  * average decimation for smoothed views.
+ *
+ * Includes buffer pooling to reduce garbage collection pressure
+ * during high-throughput real-time rendering.
  */
+
+/* ─── Reusable Buffer Pool ─── */
+
+/**
+ * Simple typed-array pool to avoid per-frame Float32Array allocations.
+ * Pools buffers by power-of-2 size buckets for efficient reuse.
+ */
+class BufferPool {
+  private pools: Map<number, Float32Array[]> = new Map();
+  private maxPerBucket = 8;
+
+  /** Get a Float32Array of at least `minSize` elements (may be larger). */
+  acquire(minSize: number): Float32Array {
+    // Round up to next power-of-2 for bucketing
+    const bucket = Math.max(64, 1 << Math.ceil(Math.log2(minSize)));
+    const pool = this.pools.get(bucket);
+
+    if (pool && pool.length > 0) {
+      const buf = pool.pop()!;
+      buf.fill(0);
+      return buf;
+    }
+
+    return new Float32Array(bucket);
+  }
+
+  /** Return a buffer to the pool for reuse. */
+  release(buf: Float32Array): void {
+    const bucket = buf.length;
+    if (!this.pools.has(bucket)) {
+      this.pools.set(bucket, []);
+    }
+    const pool = this.pools.get(bucket)!;
+    if (pool.length < this.maxPerBucket) {
+      pool.push(buf);
+    }
+  }
+}
+
+/** Shared buffer pool instance for reuse across render frames. */
+export const bufferPool = new BufferPool();
+
+/* ─── Decimation Functions ─── */
 
 /**
  * Decimate data using min/max method.
@@ -12,22 +58,37 @@
  *
  * @param data - Source sample data
  * @param targetPoints - Number of pixel columns to produce
+ * @param reuseBuffer - Optional pre-allocated buffer to write into (avoids allocation)
  * @returns Float32Array of length targetPoints * 2 (interleaved min, max)
  */
-export function decimateMinMax(data: Float32Array, targetPoints: number): Float32Array {
+export function decimateMinMax(
+  data: Float32Array,
+  targetPoints: number,
+  reuseBuffer?: Float32Array
+): Float32Array {
   const len = data.length;
-  if (len === 0) return new Float32Array(targetPoints * 2);
+  const outputLen = targetPoints * 2;
+
+  if (len === 0) {
+    return reuseBuffer && reuseBuffer.length >= outputLen
+      ? reuseBuffer.subarray(0, outputLen)
+      : new Float32Array(outputLen);
+  }
+
   if (len <= targetPoints) {
-    // No decimation needed - expand to interleaved format
-    const result = new Float32Array(len * 2);
+    const result = reuseBuffer && reuseBuffer.length >= len * 2
+      ? reuseBuffer
+      : new Float32Array(len * 2);
     for (let i = 0; i < len; i++) {
       result[i * 2] = data[i];
       result[i * 2 + 1] = data[i];
     }
-    return result;
+    return result.subarray(0, len * 2);
   }
 
-  const result = new Float32Array(targetPoints * 2);
+  const result = reuseBuffer && reuseBuffer.length >= outputLen
+    ? reuseBuffer
+    : new Float32Array(outputLen);
   const samplesPerBin = len / targetPoints;
 
   for (let bin = 0; bin < targetPoints; bin++) {
@@ -47,7 +108,7 @@ export function decimateMinMax(data: Float32Array, targetPoints: number): Float3
     result[bin * 2 + 1] = max;
   }
 
-  return result;
+  return result.subarray(0, outputLen);
 }
 
 /**
@@ -94,16 +155,13 @@ export function autoDecimate(data: Float32Array, viewportWidth: number): Float32
   const ratio = data.length / viewportWidth;
 
   if (ratio <= 1) {
-    // Fewer samples than pixels - no decimation needed
     return data;
   }
 
   if (ratio <= 2) {
-    // Slight oversampling - use averaging
     return decimateAverage(data, Math.ceil(ratio));
   }
 
-  // Significant oversampling - use min/max for faithful peak representation
   return decimateMinMax(data, viewportWidth);
 }
 
@@ -136,9 +194,8 @@ export class LODCache {
    */
   getLevel(sampleCount: number, viewportWidth: number): Float32Array | null {
     const desiredFactor = sampleCount / viewportWidth;
-    if (desiredFactor <= 1) return null; // Use raw data
+    if (desiredFactor <= 1) return null;
 
-    // Find the closest power-of-2 factor that is <= desiredFactor
     let bestFactor = 2;
     for (const factor of this.levels.keys()) {
       if (factor <= desiredFactor && factor > bestFactor) {
