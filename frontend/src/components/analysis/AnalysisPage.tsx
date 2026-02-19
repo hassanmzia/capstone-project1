@@ -11,6 +11,7 @@ import {
   GitBranch,
   Layers,
   Sigma,
+  LayoutDashboard,
 } from "lucide-react";
 
 export interface AnalysisJob {
@@ -25,6 +26,7 @@ export interface AnalysisJob {
 }
 
 const seedJobs: AnalysisJob[] = [
+  { id: "a-005", type: "Combined Analysis", recording: "session_042", recordingId: "rec-042", status: "completed", progress: 100, duration: "18m 47s", result: "6 analyses completed — 3,847 units, 142 bursts, 85.2% PCA variance" },
   { id: "a-001", type: "Spike Sorting", recording: "session_042", recordingId: "rec-042", status: "completed", progress: 100, duration: "4m 32s", result: "3,847 units classified" },
   { id: "a-002", type: "Burst Detection", recording: "session_041", recordingId: "rec-041", status: "completed", progress: 100, duration: "1m 18s", result: "142 bursts detected" },
   { id: "a-003", type: "PCA Analysis", recording: "session_042", recordingId: "rec-042", status: "completed", progress: 100, duration: "3m 45s", result: "3 components, 85.2% variance" },
@@ -45,6 +47,7 @@ function loadAnalysisJobs(): AnalysisJob[] {
 }
 
 const analysisTypes = [
+  { name: "Combined Analysis", description: "Run all 6 analysis types in a single unified job", icon: LayoutDashboard, color: "text-neural-accent-green", highlight: true },
   { name: "Spike Sorting", description: "Automated spike detection and unit classification", icon: GitBranch, color: "text-neural-accent-cyan" },
   { name: "Burst Detection", description: "Network burst identification and characterization", icon: TrendingUp, color: "text-neural-accent-green" },
   { name: "PCA / Clustering", description: "Principal component analysis for spike clustering", icon: Layers, color: "text-neural-accent-purple" },
@@ -82,22 +85,40 @@ export default function AnalysisPage() {
             Analysis Types
           </h2>
           <div className="space-y-2">
-            {analysisTypes.map((at) => (
-              <button
-                key={at.name}
-                onClick={() => setSelectedType(at.name)}
-                className={`flex items-start gap-3 w-full p-3 rounded-lg neural-transition text-left border ${
-                  selectedType === at.name
-                    ? "bg-neural-accent-cyan/10 border-neural-accent-cyan/40"
-                    : "bg-neural-surface-alt hover:bg-neural-border border-neural-border hover:border-neural-border-bright"
-                }`}
-              >
-                <at.icon className={`w-5 h-5 mt-0.5 ${at.color} shrink-0`} />
-                <div>
-                  <div className="text-sm font-medium text-neural-text-primary">{at.name}</div>
-                  <div className="text-xs text-neural-text-muted mt-0.5">{at.description}</div>
-                </div>
-              </button>
+            {analysisTypes.map((at, idx) => (
+              <div key={at.name}>
+                <button
+                  onClick={() => setSelectedType(at.name)}
+                  className={`flex items-start gap-3 w-full p-3 rounded-lg neural-transition text-left border ${
+                    selectedType === at.name
+                      ? "bg-neural-accent-cyan/10 border-neural-accent-cyan/40"
+                      : at.highlight
+                      ? "bg-neural-accent-green/5 hover:bg-neural-accent-green/10 border-neural-accent-green/30 hover:border-neural-accent-green/50"
+                      : "bg-neural-surface-alt hover:bg-neural-border border-neural-border hover:border-neural-border-bright"
+                  }`}
+                >
+                  <at.icon className={`w-5 h-5 mt-0.5 ${at.color} shrink-0`} />
+                  <div>
+                    <div className="text-sm font-medium text-neural-text-primary">
+                      {at.name}
+                      {at.highlight && (
+                        <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-neural-accent-green/20 text-neural-accent-green">
+                          ALL-IN-ONE
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-neural-text-muted mt-0.5">{at.description}</div>
+                  </div>
+                </button>
+                {/* Separator after Combined Analysis */}
+                {idx === 0 && at.highlight && (
+                  <div className="flex items-center gap-2 my-2 px-1">
+                    <div className="flex-1 h-px bg-neural-border" />
+                    <span className="text-[9px] text-neural-text-muted uppercase tracking-wider">Individual</span>
+                    <div className="flex-1 h-px bg-neural-border" />
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>

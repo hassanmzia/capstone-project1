@@ -1,7 +1,8 @@
 /**
- * 64x64 electrode spike rate heatmap.
+ * Professional 64x64 electrode spike rate heatmap.
  * Canvas-based rendering of 4096 electrode sites with configurable color maps,
- * interactive selection, and real-time WebSocket updates.
+ * interactive selection, real-time WebSocket updates, axis tick labels,
+ * grid overlay, statistics bar, and gradient color legend.
  */
 
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
@@ -39,6 +40,7 @@ export default function SpikeHeatmap({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<number>(0);
+  const offscreenRef = useRef<OffscreenCanvas | null>(null);
 
   const [tooltip, setTooltip] = useState<TooltipInfo | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -46,6 +48,7 @@ export default function SpikeHeatmap({
   const [dragEnd, setDragEnd] = useState<{ row: number; col: number } | null>(null);
   const [selectedSites, setSelectedSites] = useState<Set<number>>(new Set());
   const [scaleType, setScaleType] = useState<"linear" | "log">(colorScale);
+  const [showGrid, setShowGrid] = useState(false);
 
   const { spikeRate, spikeCounts, activeSites } = useSharedSpikeEvents();
 
@@ -56,19 +59,28 @@ export default function SpikeHeatmap({
 
   const lut = useMemo(() => buildLUT(colormap, 256), [colormap]);
 
-  // Compute min/max for color scaling
-  const { minRate, maxRate } = useMemo(() => {
+  // Compute stats for color scaling and display
+  const { minRate, maxRate, meanRate, peakSite } = useMemo(() => {
     let min = Infinity;
     let max = -Infinity;
+    let sum = 0;
+    let peakIdx = 0;
     for (let i = 0; i < spikeRate.length; i++) {
       const v = spikeRate[i];
+      sum += v;
       if (v < min) min = v;
-      if (v > max) max = v;
+      if (v > max) { max = v; peakIdx = i; }
     }
     if (min === Infinity) min = 0;
     if (max === -Infinity || max === min) max = min + 1;
-    return { minRate: min, maxRate: max };
+    const mean = spikeRate.length > 0 ? sum / spikeRate.length : 0;
+    return { minRate: min, maxRate: max, meanRate: mean, peakSite: peakIdx };
   }, [spikeRate]);
+
+  // Reusable offscreen canvas
+  useEffect(() => {
+    offscreenRef.current = new OffscreenCanvas(gridSize, gridSize);
+  }, [gridSize]);
 
   // Canvas rendering
   useEffect(() => {
@@ -84,20 +96,36 @@ export default function SpikeHeatmap({
     const renderFrame = () => {
       if (!running) return;
 
-      const { width, height } = container.getBoundingClientRect();
-      const size = Math.min(width, height);
+      const { width: cW, height: cH } = container.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.round(size * dpr);
-      canvas.height = Math.round(size * dpr);
-      canvas.style.width = `${size}px`;
-      canvas.style.height = `${size}px`;
-      ctx.scale(dpr, dpr);
 
+      // Margins for axis labels
+      const axisLabelSpace = Math.round(Math.max(18, cW * 0.05));
+      const topPad = 4;
+      const size = Math.min(cW - axisLabelSpace, cH - axisLabelSpace - topPad);
+      if (size <= 0) { animRef.current = requestAnimationFrame(renderFrame); return; }
+
+      canvas.width = Math.round(cW * dpr);
+      canvas.height = Math.round(cH * dpr);
+      canvas.style.width = `${cW}px`;
+      canvas.style.height = `${cH}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      // Clear
+      ctx.fillStyle = "#0a0f1e";
+      ctx.fillRect(0, 0, cW, cH);
+
+      const ox = axisLabelSpace; // heatmap X offset
+      const oy = topPad;         // heatmap Y offset
       const cellW = size / gridSize;
       const cellH = size / gridSize;
 
-      // Create ImageData for efficient pixel-level rendering
-      const imageData = ctx.createImageData(gridSize, gridSize);
+      // Build ImageData
+      const offscreen = offscreenRef.current ?? new OffscreenCanvas(gridSize, gridSize);
+      const offCtx = offscreen.getContext("2d");
+      if (!offCtx) { animRef.current = requestAnimationFrame(renderFrame); return; }
+
+      const imageData = offCtx.createImageData(gridSize, gridSize);
       const pixels = imageData.data;
 
       for (let row = 0; row < gridSize; row++) {
@@ -123,33 +151,73 @@ export default function SpikeHeatmap({
       }
 
       // Scale up the small image to fill canvas
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.imageSmoothingEnabled = false;
+      offCtx.putImageData(imageData, 0, 0);
+      ctx.drawImage(offscreen, ox, oy, size, size);
 
-      // Draw to offscreen canvas first, then scale up
-      const offscreen = new OffscreenCanvas(gridSize, gridSize);
-      const offCtx = offscreen.getContext("2d");
-      if (offCtx) {
-        offCtx.putImageData(imageData, 0, 0);
-        ctx.drawImage(offscreen, 0, 0, size, size);
+      // ── Grid overlay (every 8 electrodes) ──
+      if (showGrid) {
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.15)";
+        ctx.lineWidth = 0.5;
+        const step = 8;
+        for (let i = step; i < gridSize; i += step) {
+          // Vertical
+          const x = ox + i * cellW;
+          ctx.beginPath();
+          ctx.moveTo(x, oy);
+          ctx.lineTo(x, oy + size);
+          ctx.stroke();
+          // Horizontal
+          const y = oy + i * cellH;
+          ctx.beginPath();
+          ctx.moveTo(ox, y);
+          ctx.lineTo(ox + size, y);
+          ctx.stroke();
+        }
       }
 
-      // Draw selection overlay
+      // ── Heatmap border ──
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.25)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(ox, oy, size, size);
+
+      // ── Axis tick labels ──
+      const tickFont = `${Math.max(7, Math.round(axisLabelSpace * 0.4))}px monospace`;
+      ctx.font = tickFont;
+      ctx.fillStyle = "rgba(148, 163, 184, 0.55)";
+
+      // Left axis (row ticks every 8)
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      for (let r = 0; r < gridSize; r += 8) {
+        const y = oy + r * cellH + cellH * 4; // center of the 8-row group
+        ctx.fillText(String(r), ox - 3, y);
+      }
+
+      // Bottom axis (col ticks every 8)
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      for (let c = 0; c < gridSize; c += 8) {
+        const x = ox + c * cellW + cellW * 4;
+        ctx.fillText(String(c), x, oy + size + 3);
+      }
+
+      // ── Selection overlay ──
       if (selectedSites.size > 0) {
         ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
         ctx.lineWidth = 1;
         for (const site of selectedSites) {
           const { row: r, col: c } = siteToRowCol(site);
-          ctx.strokeRect(c * cellW, r * cellH, cellW, cellH);
+          ctx.strokeRect(ox + c * cellW, oy + r * cellH, cellW, cellH);
         }
       }
 
-      // Draw drag selection rectangle
+      // ── Drag selection rectangle ──
       if (isDragging && dragStart && dragEnd) {
-        const x0 = Math.min(dragStart.col, dragEnd.col) * cellW;
-        const y0 = Math.min(dragStart.row, dragEnd.row) * cellH;
-        const x1 = (Math.max(dragStart.col, dragEnd.col) + 1) * cellW;
-        const y1 = (Math.max(dragStart.row, dragEnd.row) + 1) * cellH;
+        const x0 = ox + Math.min(dragStart.col, dragEnd.col) * cellW;
+        const y0 = oy + Math.min(dragStart.row, dragEnd.row) * cellH;
+        const x1 = ox + (Math.max(dragStart.col, dragEnd.col) + 1) * cellW;
+        const y1 = oy + (Math.max(dragStart.row, dragEnd.row) + 1) * cellH;
         ctx.strokeStyle = "rgba(6, 182, 212, 0.9)";
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
@@ -167,17 +235,29 @@ export default function SpikeHeatmap({
       running = false;
       cancelAnimationFrame(animRef.current);
     };
-  }, [spikeRate, gridSize, lut, scaleType, minRate, maxRate, selectedSites, isDragging, dragStart, dragEnd]);
+  }, [spikeRate, gridSize, lut, scaleType, minRate, maxRate, selectedSites, isDragging, dragStart, dragEnd, showGrid]);
 
   const getCellFromEvent = useCallback(
     (e: React.MouseEvent): { row: number; col: number } | null => {
+      const container = containerRef.current;
       const canvas = canvasRef.current;
-      if (!canvas) return null;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const col = Math.floor((x / rect.width) * gridSize);
-      const row = Math.floor((y / rect.height) * gridSize);
+      if (!container || !canvas) return null;
+
+      const cRect = container.getBoundingClientRect();
+      const cW = cRect.width;
+      const cH = cRect.height;
+      const axisLabelSpace = Math.round(Math.max(18, cW * 0.05));
+      const topPad = 4;
+      const size = Math.min(cW - axisLabelSpace, cH - axisLabelSpace - topPad);
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const mx = e.clientX - canvasRect.left;
+      const my = e.clientY - canvasRect.top;
+      const ox = axisLabelSpace;
+      const oy = topPad;
+
+      const col = Math.floor(((mx - ox) / size) * gridSize);
+      const row = Math.floor(((my - oy) / size) * gridSize);
       if (row < 0 || row >= gridSize || col < 0 || col >= gridSize) return null;
       return { row, col };
     },
@@ -233,7 +313,6 @@ export default function SpikeHeatmap({
         const c1 = Math.max(dragStart.col, dragEnd.col);
 
         if (r0 === r1 && c0 === c1) {
-          // Single click
           const site = rowColToSite(r0, c0);
           const newSelected = new Set(selectedSites);
           if (newSelected.has(site)) {
@@ -244,7 +323,6 @@ export default function SpikeHeatmap({
           setSelectedSites(newSelected);
           onSiteSelect?.(site);
         } else {
-          // Rectangle selection
           const sites: number[] = [];
           for (let r = r0; r <= r1; r++) {
             for (let c = c0; c <= c1; c++) {
@@ -277,31 +355,60 @@ export default function SpikeHeatmap({
     [colormap]
   );
 
+  const activePercent = spikeRate.length > 0
+    ? ((activeSites / spikeRate.length) * 100).toFixed(1)
+    : "0.0";
+
   return (
     <div className={`flex flex-col bg-neural-surface rounded-xl border border-neural-border ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-neural-border">
+      {/* ── Header ── */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-neural-border shrink-0">
         <h3 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider">
-          Spike Heatmap ({gridSize}x{gridSize})
-        </h3>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-neural-text-muted">
-            {activeSites} active
+          Spike Heatmap
+          <span className="ml-1.5 text-neural-text-muted font-normal normal-case">
+            {gridSize}&times;{gridSize}
           </span>
+        </h3>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShowGrid(!showGrid)}
+            className={`px-1.5 py-0.5 text-[10px] rounded neural-transition ${
+              showGrid
+                ? "bg-neural-accent-cyan/20 text-neural-accent-cyan"
+                : "bg-neural-surface-alt text-neural-text-muted hover:text-neural-text-primary border border-neural-border"
+            }`}
+          >
+            GRID
+          </button>
           <button
             onClick={() => setScaleType(scaleType === "linear" ? "log" : "linear")}
-            className="px-1.5 py-0.5 text-[10px] rounded bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border"
+            className="px-1.5 py-0.5 text-[10px] rounded bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition"
           >
             {scaleType === "linear" ? "LIN" : "LOG"}
           </button>
         </div>
       </div>
 
-      {/* Canvas */}
-      <div ref={containerRef} className="flex-1 relative p-2 min-h-0 aspect-square">
+      {/* ── Stats bar ── */}
+      <div className="flex items-center gap-3 px-3 py-1 border-b border-neural-border/50 text-[10px] font-mono shrink-0">
+        <span className="text-neural-text-muted">
+          Active: <span className="text-neural-accent-green">{activeSites}</span>
+          <span className="text-neural-text-muted/50"> ({activePercent}%)</span>
+        </span>
+        <span className="text-neural-text-muted">
+          Peak: <span className="text-neural-accent-amber">{maxRate.toFixed(1)} Hz</span>
+          <span className="text-neural-text-muted/50"> @{peakSite}</span>
+        </span>
+        <span className="text-neural-text-muted">
+          Mean: <span className="text-neural-accent-cyan">{meanRate.toFixed(1)} Hz</span>
+        </span>
+      </div>
+
+      {/* ── Canvas ── */}
+      <div ref={containerRef} className="flex-1 relative p-1 min-h-0 aspect-square">
         <canvas
           ref={canvasRef}
-          className="absolute inset-2 cursor-crosshair"
+          className="absolute inset-1 cursor-crosshair"
           style={{ imageRendering: "pixelated" }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -312,41 +419,44 @@ export default function SpikeHeatmap({
         {/* Tooltip */}
         {tooltip && (
           <div
-            className="absolute pointer-events-none bg-neural-surface-alt/95 border border-neural-border rounded px-2 py-1.5 text-xs z-20 whitespace-nowrap"
+            className="absolute pointer-events-none bg-neural-surface-alt/95 border border-neural-border rounded-lg shadow-lg px-2.5 py-2 text-xs z-20 whitespace-nowrap"
             style={{
-              left: Math.min(tooltip.x + 16, (containerRef.current?.clientWidth ?? 200) - 140),
-              top: Math.max(tooltip.y - 50, 4),
+              left: Math.min(tooltip.x + 16, (containerRef.current?.clientWidth ?? 200) - 150),
+              top: Math.max(tooltip.y - 60, 4),
             }}
           >
-            <div className="font-mono text-neural-text-primary font-semibold">
+            <div className="font-mono text-neural-text-primary font-semibold text-[11px]">
               {getSiteLabel(tooltip.siteIndex)}
             </div>
-            <div className="text-neural-text-muted">
-              Site #{tooltip.siteIndex} ({tooltip.row}, {tooltip.col})
+            <div className="text-neural-text-muted text-[10px] mb-0.5">
+              Site #{tooltip.siteIndex} &middot; ({tooltip.row}, {tooltip.col})
             </div>
-            <div className="text-neural-accent-cyan">
-              Rate: {tooltip.spikeRate.toFixed(1)} Hz
-            </div>
-            <div className="text-neural-text-secondary">
-              Count: {Math.round(tooltip.spikeCount)}
+            <div className="flex items-center gap-3 mt-1 pt-1 border-t border-neural-border/50">
+              <span className="text-neural-accent-cyan">
+                {tooltip.spikeRate.toFixed(1)} <span className="text-neural-text-muted">Hz</span>
+              </span>
+              <span className="text-neural-text-secondary">
+                {Math.round(tooltip.spikeCount)} <span className="text-neural-text-muted">spikes</span>
+              </span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Color scale legend */}
-      <div className="px-3 pb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[9px] text-neural-text-muted font-mono">
-            {minRate.toFixed(1)}
-          </span>
-          <div
-            className="flex-1 h-2 rounded-sm"
-            style={{ background: gradientCSS }}
-          />
-          <span className="text-[9px] text-neural-text-muted font-mono">
-            {maxRate.toFixed(1)} Hz
-          </span>
+      {/* ── Color scale legend ── */}
+      <div className="px-3 pb-2 pt-1 shrink-0">
+        <div className="flex items-center gap-2 text-[9px] text-neural-text-muted">
+          <span className="font-mono w-8 text-right">{minRate.toFixed(1)}</span>
+          <div className="flex-1 relative">
+            <div
+              className="h-2.5 rounded-sm border border-neural-border/30"
+              style={{ background: gradientCSS }}
+            />
+          </div>
+          <span className="font-mono w-14">{maxRate.toFixed(1)} Hz</span>
+        </div>
+        <div className="text-center text-[9px] text-neural-text-muted/60 mt-0.5">
+          Spike Rate ({scaleType === "log" ? "log" : "linear"} scale)
         </div>
       </div>
     </div>
