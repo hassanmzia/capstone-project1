@@ -193,7 +193,7 @@ export default function VisualizationPage() {
   return (
     <div className="flex flex-col h-full gap-0 overflow-hidden">
       {/* ─── Top Toolbar ─── */}
-      <div className="flex items-center justify-between bg-neural-surface border-b border-neural-border px-2 md:px-3 py-1.5 md:py-2 shrink-0 gap-1 overflow-x-auto">
+      <div className="flex items-center flex-wrap bg-neural-surface border-b border-neural-border px-2 md:px-3 py-1.5 md:py-2 shrink-0 gap-1 md:gap-2">
         {/* Display mode tabs */}
         <div className="flex items-center gap-0.5 md:gap-1 bg-neural-surface-alt rounded-lg p-0.5 shrink-0">
           {displayModes.map(({ mode, label, icon: Icon }) => (
@@ -213,12 +213,12 @@ export default function VisualizationPage() {
         </div>
 
         {/* Data source indicator */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {mode === "live" && activeSession && (
             <div className="flex items-center gap-1.5 bg-neural-accent-red/15 border border-neural-accent-red/30 rounded-lg px-2.5 py-1">
               <Circle className="w-2.5 h-2.5 text-neural-accent-red animate-pulse fill-current" />
               <span className="text-xs font-semibold text-neural-accent-red tracking-wide">LIVE</span>
-              <span className="text-[10px] text-neural-accent-red/70 font-mono">{activeSession.name}</span>
+              <span className="hidden sm:inline text-[10px] text-neural-accent-red/70 font-mono">{activeSession.name}</span>
               {activeSession.isPaused && (
                 <span className="text-[10px] text-neural-accent-amber ml-1">(PAUSED)</span>
               )}
@@ -228,8 +228,8 @@ export default function VisualizationPage() {
             <div className="flex items-center gap-1.5 bg-neural-accent-purple/15 border border-neural-accent-purple/30 rounded-lg px-2.5 py-1">
               <Disc className="w-3 h-3 text-neural-accent-purple" />
               <span className="text-xs font-semibold text-neural-accent-purple tracking-wide">PLAYBACK</span>
-              <span className="text-[10px] text-neural-accent-purple/70 font-mono">{playbackSession.name}</span>
-              <span className="text-[10px] text-neural-text-muted">({playbackSession.duration})</span>
+              <span className="hidden sm:inline text-[10px] text-neural-accent-purple/70 font-mono">{playbackSession.name}</span>
+              <span className="hidden sm:inline text-[10px] text-neural-text-muted">({playbackSession.duration})</span>
               <button
                 onClick={() => endPlayback()}
                 className="ml-1 p-0.5 rounded hover:bg-neural-accent-purple/20 text-neural-accent-purple/60 hover:text-neural-accent-purple neural-transition"
@@ -349,9 +349,9 @@ export default function VisualizationPage() {
           </button>
 
           {viz.isPaused && (
-            <span className="ml-2 flex items-center gap-1 bg-neural-accent-amber/20 text-neural-accent-amber px-2 py-0.5 rounded text-xs font-medium">
+            <span className="ml-1 md:ml-2 flex items-center gap-1 bg-neural-accent-amber/20 text-neural-accent-amber px-1.5 md:px-2 py-0.5 rounded text-xs font-medium shrink-0">
               <Pause className="w-3 h-3" />
-              PAUSED
+              <span className="hidden sm:inline">PAUSED</span>
             </span>
           )}
         </div>
@@ -550,20 +550,20 @@ export default function VisualizationPage() {
 
       {/* ─── Playback Progress Bar ─── */}
       {mode === "playback" && playbackSession && (
-        <div className="bg-neural-surface border-t border-neural-border px-4 py-2 shrink-0">
+        <div className="bg-neural-surface border-t border-neural-border px-2 md:px-4 py-2 shrink-0">
           {/* Recording info row */}
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-3 text-[11px] text-neural-text-muted">
+          <div className="flex items-center justify-between flex-wrap gap-1 mb-1.5">
+            <div className="flex items-center gap-2 md:gap-3 text-[11px] text-neural-text-muted flex-wrap">
               <span className="flex items-center gap-1">
                 <HardDrive className="w-3 h-3" />
                 <span className="font-mono text-neural-text-secondary">{playbackSession.name}</span>
               </span>
-              <span>{playbackSession.experimentName}</span>
+              <span className="hidden sm:inline">{playbackSession.experimentName}</span>
               <span className="flex items-center gap-1">
                 <Cpu className="w-3 h-3" />
                 {playbackSession.channels}ch
               </span>
-              <span className="flex items-center gap-1">
+              <span className="hidden sm:flex items-center gap-1">
                 <Zap className="w-3 h-3" />
                 {playbackSession.spikeCount.toLocaleString()} spikes
               </span>
@@ -587,7 +587,7 @@ export default function VisualizationPage() {
           </div>
 
           {/* Progress bar + controls */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             {/* Transport controls */}
             <div className="flex items-center gap-1">
               <button
@@ -654,7 +654,7 @@ export default function VisualizationPage() {
             </span>
 
             {/* Elapsed indicator */}
-            <div className="flex items-center gap-1 text-[10px] text-neural-text-muted">
+            <div className="hidden sm:flex items-center gap-1 text-[10px] text-neural-text-muted">
               <Clock className="w-3 h-3" />
               {playbackElapsed >= playbackTotalSec ? (
                 <span className="text-neural-accent-green">Complete</span>
