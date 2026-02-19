@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   FlaskConical,
@@ -11,8 +11,9 @@ import {
   Brain,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -25,22 +26,38 @@ const navItems = [
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 
-export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}
 
-  return (
-    <aside
-      className={`flex flex-col bg-neural-surface border-r border-neural-border transition-all duration-300 ${
-        collapsed ? "w-16" : "w-56"
-      }`}
-    >
+export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
+  const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    onMobileClose?.();
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const navContent = (
+    <>
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 h-14 border-b border-neural-border">
+      <div className="flex items-center gap-3 px-4 h-14 border-b border-neural-border shrink-0">
         <Brain className="w-7 h-7 text-neural-accent-cyan shrink-0" />
-        {!collapsed && (
+        {(!collapsed || mobileOpen) && (
           <span className="text-lg font-bold tracking-tight text-neural-text-primary whitespace-nowrap">
             CNEAv5
           </span>
+        )}
+        {/* Mobile close button */}
+        {mobileOpen && (
+          <button
+            onClick={onMobileClose}
+            className="ml-auto p-1 rounded-lg text-neural-text-muted hover:text-neural-text-primary hover:bg-neural-surface-alt md:hidden"
+          >
+            <X className="w-5 h-5" />
+          </button>
         )}
       </div>
 
@@ -56,23 +73,49 @@ export default function Sidebar() {
                 isActive
                   ? "bg-neural-accent-cyan/10 text-neural-accent-cyan neural-glow-cyan"
                   : "text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-surface-alt"
-              } ${collapsed ? "justify-center" : ""}`
+              } ${collapsed && !mobileOpen ? "justify-center" : ""}`
             }
-            title={collapsed ? label : undefined}
+            title={collapsed && !mobileOpen ? label : undefined}
           >
             <Icon className="w-5 h-5 shrink-0" />
-            {!collapsed && <span>{label}</span>}
+            {(!collapsed || mobileOpen) && <span>{label}</span>}
           </NavLink>
         ))}
       </nav>
 
-      {/* Collapse toggle */}
+      {/* Collapse toggle (desktop only) */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center justify-center h-10 border-t border-neural-border text-neural-text-muted hover:text-neural-text-primary neural-transition"
+        className="hidden md:flex items-center justify-center h-10 border-t border-neural-border text-neural-text-muted hover:text-neural-text-primary neural-transition"
       >
         {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
       </button>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside
+        className={`hidden md:flex flex-col bg-neural-surface border-r border-neural-border transition-all duration-300 ${
+          collapsed ? "w-16" : "w-56"
+        }`}
+      >
+        {navContent}
+      </aside>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/60 z-40 md:hidden"
+            onClick={onMobileClose}
+          />
+          <aside className="fixed inset-y-0 left-0 w-64 z-50 flex flex-col bg-neural-surface border-r border-neural-border md:hidden">
+            {navContent}
+          </aside>
+        </>
+      )}
+    </>
   );
 }

@@ -220,20 +220,22 @@ function ParamSlider({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="flex items-center gap-4 py-2">
-      <label className="text-sm text-neural-text-secondary w-40 shrink-0">{label}</label>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="flex-1 h-1.5 rounded-full appearance-none bg-neural-border-bright accent-neural-accent-cyan"
-      />
-      <span className="text-sm font-mono text-neural-text-primary w-20 text-right">
-        {value.toFixed(step < 1 ? 2 : 0)} {unit}
-      </span>
+    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 py-2">
+      <label className="text-xs sm:text-sm text-neural-text-secondary sm:w-40 shrink-0">{label}</label>
+      <div className="flex items-center gap-2 sm:gap-4 flex-1">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          className="flex-1 h-1.5 rounded-full appearance-none bg-neural-border-bright accent-neural-accent-cyan"
+        />
+        <span className="text-xs sm:text-sm font-mono text-neural-text-primary w-16 sm:w-20 text-right shrink-0">
+          {value.toFixed(step < 1 ? 2 : 0)} {unit}
+        </span>
+      </div>
     </div>
   );
 }
@@ -343,25 +345,29 @@ export default function ControlsPage() {
   }, [dispatch]);
 
   return (
-    <div className="flex flex-col gap-4 h-full">
+    <div className="flex flex-col gap-2 md:gap-4 h-full">
       {/* Tabs + toolbar */}
-      <div className="flex items-center gap-1 bg-neural-surface rounded-xl border border-neural-border p-2">
-        {tabs.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium neural-transition ${
-              activeTab === id
-                ? "bg-neural-accent-cyan/15 text-neural-accent-cyan"
-                : "text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-surface-alt"
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            {label}
-          </button>
-        ))}
+      <div className="flex flex-col md:flex-row md:items-center gap-1 bg-neural-surface rounded-xl border border-neural-border p-2">
+        {/* Scrollable tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 -mx-1 px-1 scrollbar-hide">
+          {tabs.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`flex items-center gap-1.5 md:gap-2 px-2.5 md:px-4 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-medium neural-transition whitespace-nowrap shrink-0 ${
+                activeTab === id
+                  ? "bg-neural-accent-cyan/15 text-neural-accent-cyan"
+                  : "text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-surface-alt"
+              }`}
+            >
+              <Icon className="w-3.5 md:w-4 h-3.5 md:h-4" />
+              <span className="hidden sm:inline">{label}</span>
+              <span className="sm:hidden">{id === "stim" ? "Stim" : id === "bias" ? "Bias" : label.split("/")[0]}</span>
+            </button>
+          ))}
+        </div>
 
-        <div className="flex-1" />
+        <div className="hidden md:block flex-1" />
 
         {/* Apply toast */}
         {applyToast && (
@@ -387,14 +393,17 @@ export default function ControlsPage() {
           </div>
         )}
 
+        {/* Action buttons row */}
+        <div className="flex items-center gap-1 md:gap-2 mt-1 md:mt-0">
         {/* Preset dropdown */}
         <div className="relative" ref={presetMenuRef}>
           <button
             onClick={() => setShowPresetMenu(!showPresetMenu)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition"
+            className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 rounded-lg text-xs md:text-sm bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition"
           >
-            <Upload className="w-4 h-4" />
-            Load Preset
+            <Upload className="w-3.5 md:w-4 h-3.5 md:h-4" />
+            <span className="hidden sm:inline">Load Preset</span>
+            <span className="sm:hidden">Preset</span>
           </button>
           {showPresetMenu && (
             <div className="absolute top-full right-0 mt-1 w-64 bg-neural-surface border border-neural-border rounded-lg shadow-xl z-50 py-1">
@@ -423,22 +432,23 @@ export default function ControlsPage() {
 
         <button
           onClick={() => dispatch(resetConfig())}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition"
+          className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 rounded-lg text-xs md:text-sm bg-neural-surface-alt text-neural-text-secondary hover:text-neural-text-primary border border-neural-border neural-transition"
         >
-          <RotateCcw className="w-4 h-4" />
+          <RotateCcw className="w-3.5 md:w-4 h-3.5 md:h-4" />
           Reset
         </button>
         <button
           onClick={handleApply}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition"
+          className="flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 rounded-lg text-xs md:text-sm bg-neural-accent-cyan/20 text-neural-accent-cyan hover:bg-neural-accent-cyan/30 border border-neural-accent-cyan/30 neural-transition"
         >
-          <Save className="w-4 h-4" />
+          <Save className="w-3.5 md:w-4 h-3.5 md:h-4" />
           Apply
         </button>
+        </div>
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 bg-neural-surface rounded-xl border border-neural-border p-6 overflow-y-auto">
+      <div className="flex-1 bg-neural-surface rounded-xl border border-neural-border p-3 md:p-6 overflow-y-auto">
         {/* ── Bias Configuration ── */}
         {activeTab === "bias" && (
           <div>
@@ -542,7 +552,7 @@ export default function ControlsPage() {
             <p className="text-sm text-neural-text-muted mb-6">
               Select the amplifier gain mode for the electrode array.
             </p>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               {(["low", "medium", "high", "ultra"] as GainMode[]).map((mode) => {
                 const info = { low: { gain: "100x", noise: "~8 uV", bw: "Wide" }, medium: { gain: "500x", noise: "~5 uV", bw: "Medium" }, high: { gain: "1000x", noise: "~3 uV", bw: "Standard" }, ultra: { gain: "5000x", noise: "~1.5 uV", bw: "Narrow" } }[mode];
                 return (

@@ -105,7 +105,7 @@ export default function LoginPage() {
       </div>
 
       {/* Card */}
-      <div className="w-full max-w-md bg-neural-surface border border-neural-border rounded-2xl p-8 shadow-xl shadow-black/20">
+      <div className="w-full max-w-md bg-neural-surface border border-neural-border rounded-2xl p-4 md:p-8 shadow-xl shadow-black/20 mx-2 md:mx-0">
 
         {/* ── Verify Email Step ── */}
         {mode === "verify" && (

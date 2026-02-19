@@ -78,6 +78,16 @@
   background-size: 20px 20px;
 }
 
+/* Hide scrollbar for horizontal tab scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Smooth transitions */
 .neural-transition {
   transition: all 0.2s ease-in-out;
