@@ -282,8 +282,8 @@ export default function WaveformDisplay({
   return (
     <div className={`flex flex-col bg-neural-surface rounded-xl border border-neural-border ${className}`}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-neural-border">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center flex-wrap gap-2 px-3 py-2 border-b border-neural-border">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => dispatch(setAmplitudeScale(viz.amplitudeScale * 1.5))}
             className="p-1.5 rounded-md text-neural-text-secondary hover:text-neural-text-primary hover:bg-neural-surface-alt neural-transition"
@@ -330,7 +330,7 @@ export default function WaveformDisplay({
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center flex-wrap gap-2 ml-auto">
           {/* Timebase selector */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-neural-text-muted">Time:</span>
@@ -391,7 +391,7 @@ export default function WaveformDisplay({
       <div className="flex flex-1 min-h-0">
         {/* Y-axis channel labels */}
         {isStacked && (
-          <div className="flex flex-col w-12 py-1 border-r border-neural-border/50 shrink-0">
+          <div className="flex flex-col w-8 sm:w-12 py-1 border-r border-neural-border/50 shrink-0">
             {channels.slice(0, 64).map((ch, idx) => (
               <div
                 key={ch}

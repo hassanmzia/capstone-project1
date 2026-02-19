@@ -289,11 +289,11 @@ export default function FFTDisplay({
   return (
     <div className={`flex flex-col bg-neural-surface rounded-xl border border-neural-border ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-neural-border">
-        <h3 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider">
+      <div className="flex items-center flex-wrap gap-2 px-3 py-2 border-b border-neural-border">
+        <h3 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider shrink-0">
           FFT Spectrum
         </h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center flex-wrap gap-2 ml-auto">
           <button
             onClick={() => setIsLogScale(!isLogScale)}
             className={`px-1.5 py-0.5 text-[10px] rounded border border-neural-border ${
@@ -325,7 +325,7 @@ export default function FFTDisplay({
 
       {/* Peak frequencies footer */}
       {peakFreqs.size > 0 && (
-        <div className="flex items-center gap-3 px-3 py-1.5 border-t border-neural-border overflow-x-auto">
+        <div className="flex items-center flex-wrap gap-2 px-3 py-1.5 border-t border-neural-border min-w-0">
           {Array.from(peakFreqs.entries()).map(([ch, freq], i) => (
             <span
               key={ch}

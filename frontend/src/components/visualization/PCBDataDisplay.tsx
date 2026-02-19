@@ -225,7 +225,7 @@ export default function PCBDataDisplay({
       </div>
 
       {/* Channel toggles */}
-      <div className="flex flex-wrap gap-1 px-3 py-1.5 border-b border-neural-border">
+      <div className="flex flex-wrap gap-1 px-2 sm:px-3 py-1.5 border-b border-neural-border min-w-0 overflow-hidden">
         {PCB_CHANNELS.map((ch) => (
           <button
             key={ch.index}
