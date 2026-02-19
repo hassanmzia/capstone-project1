@@ -547,6 +547,280 @@ function CrossCorrelationChart() {
   );
 }
 
+function SpectralAnalysisChart() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const padL = 36;
+    const padR = 10;
+    const padT = 10;
+    const padB = 28;
+    const plotW = w - padL - padR;
+    const plotH = h - padT - padB;
+
+    // Background grid
+    ctx.strokeStyle = "rgba(100,116,139,0.15)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (plotH / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(padL, y);
+      ctx.lineTo(w - padR, y);
+      ctx.stroke();
+    }
+
+    // Frequency bands (shaded regions)
+    const bands = [
+      { name: "Delta", fMin: 1, fMax: 4, color: "rgba(139,92,246,0.08)" },
+      { name: "Theta", fMin: 4, fMax: 8, color: "rgba(6,182,212,0.12)" },
+      { name: "Alpha", fMin: 8, fMax: 13, color: "rgba(52,211,153,0.10)" },
+      { name: "Beta", fMin: 13, fMax: 30, color: "rgba(251,191,36,0.10)" },
+      { name: "Gamma", fMin: 30, fMax: 100, color: "rgba(244,63,94,0.08)" },
+    ];
+
+    const maxFreq = 200;
+    const freqToX = (f: number) => padL + (Math.log10(Math.max(f, 1)) / Math.log10(maxFreq)) * plotW;
+
+    bands.forEach((band) => {
+      const x1 = freqToX(band.fMin);
+      const x2 = freqToX(band.fMax);
+      ctx.fillStyle = band.color;
+      ctx.fillRect(x1, padT, x2 - x1, plotH);
+    });
+
+    // Generate PSD curve (1/f shape with band peaks)
+    const points: { x: number; y: number }[] = [];
+    for (let f = 1; f <= maxFreq; f += 0.5) {
+      // Base 1/f slope
+      let power = 60 / (f * 0.3 + 1);
+      // Theta peak at ~6 Hz
+      power += 18 * Math.exp(-((f - 6) ** 2) / 4);
+      // Alpha peak at ~10 Hz
+      power += 10 * Math.exp(-((f - 10) ** 2) / 3);
+      // Beta bump at ~20 Hz
+      power += 5 * Math.exp(-((f - 20) ** 2) / 20);
+      // Small gamma bump at ~40 Hz
+      power += 3 * Math.exp(-((f - 40) ** 2) / 40);
+      // Noise
+      power += (Math.random() - 0.5) * 1.5;
+
+      const x = freqToX(f);
+      const y = padT + plotH - (power / 80) * plotH;
+      points.push({ x, y: Math.max(padT, Math.min(padT + plotH, y)) });
+    }
+
+    // Fill area under curve
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, padT + plotH);
+    points.forEach((p) => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(points[points.length - 1].x, padT + plotH);
+    ctx.closePath();
+    ctx.fillStyle = "rgba(6,182,212,0.1)";
+    ctx.fill();
+
+    // Draw PSD line
+    ctx.beginPath();
+    points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+    ctx.strokeStyle = "#06b6d4";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Axes
+    ctx.strokeStyle = "rgba(100,116,139,0.4)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, padT + plotH);
+    ctx.lineTo(w - padR, padT + plotH);
+    ctx.moveTo(padL, padT);
+    ctx.lineTo(padL, padT + plotH);
+    ctx.stroke();
+
+    // Frequency labels
+    ctx.fillStyle = "rgba(148,163,184,0.6)";
+    ctx.font = "9px monospace";
+    [1, 4, 10, 30, 100].forEach((f) => {
+      const x = freqToX(f);
+      ctx.fillText(`${f}`, x - 4, padT + plotH + 12);
+    });
+    ctx.fillText("Hz", w - padR - 10, padT + plotH + 12);
+
+    // Y-axis label
+    ctx.save();
+    ctx.translate(8, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("Power (dB)", -20, 0);
+    ctx.restore();
+
+    // Band labels at top
+    ctx.font = "8px sans-serif";
+    const bandLabels = [
+      { name: "δ", f: 2.5, color: "rgba(139,92,246,0.7)" },
+      { name: "θ", f: 6, color: "rgba(6,182,212,0.9)" },
+      { name: "α", f: 10, color: "rgba(52,211,153,0.8)" },
+      { name: "β", f: 20, color: "rgba(251,191,36,0.8)" },
+      { name: "γ", f: 55, color: "rgba(244,63,94,0.7)" },
+    ];
+    bandLabels.forEach((bl) => {
+      ctx.fillStyle = bl.color;
+      ctx.fillText(bl.name, freqToX(bl.f) - 3, padT + 10);
+    });
+  }, []);
+
+  return (
+    <div>
+      <p className="text-xs text-neural-text-muted mb-2">Power Spectral Density (log frequency scale)</p>
+      <canvas ref={canvasRef} width={320} height={180} className="w-full rounded bg-neural-surface-alt border border-neural-border" />
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
+        {[
+          { label: "Theta", pct: "42.3%", color: "bg-cyan-400" },
+          { label: "Alpha", pct: "21.5%", color: "bg-emerald-400" },
+          { label: "Beta", pct: "17.5%", color: "bg-amber-400" },
+          { label: "Gamma", pct: "18.7%", color: "bg-rose-400" },
+        ].map((b) => (
+          <span key={b.label} className="flex items-center gap-1 text-[10px] text-neural-text-muted">
+            <span className={`w-1.5 h-1.5 rounded-full ${b.color} inline-block`} />
+            {b.label} {b.pct}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ISIAnalysisChart() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const padL = 36;
+    const padR = 10;
+    const padT = 10;
+    const padB = 28;
+    const plotW = w - padL - padR;
+    const plotH = h - padT - padB;
+
+    // Background grid
+    ctx.strokeStyle = "rgba(100,116,139,0.15)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = padT + (plotH / 4) * i;
+      ctx.beginPath();
+      ctx.moveTo(padL, y);
+      ctx.lineTo(w - padR, y);
+      ctx.stroke();
+    }
+
+    // Generate ISI histogram (log-normal distribution typical for neural data)
+    const bins = 50;
+    const binW = plotW / bins;
+    const maxISI = 500; // ms
+    const values: number[] = [];
+
+    for (let i = 0; i < bins; i++) {
+      const isiCenter = (i + 0.5) * (maxISI / bins);
+      // Log-normal distribution with peak around 15-20ms
+      const logISI = Math.log(Math.max(isiCenter, 0.1));
+      const mu = 2.8; // peak ~16ms
+      const sigma = 0.8;
+      let val = Math.exp(-((logISI - mu) ** 2) / (2 * sigma * sigma));
+      // Second smaller peak (bursting) around 3-5ms
+      val += 0.4 * Math.exp(-((isiCenter - 4) ** 2) / 5);
+      // Noise
+      val += Math.random() * 0.03;
+      values.push(val);
+    }
+
+    const maxVal = Math.max(...values);
+
+    // Refractory period zone (0-2ms)
+    const refractoryX = padL + (2 / maxISI) * plotW;
+    ctx.fillStyle = "rgba(239,68,68,0.08)";
+    ctx.fillRect(padL, padT, refractoryX - padL, plotH);
+    ctx.strokeStyle = "rgba(239,68,68,0.3)";
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(refractoryX, padT);
+    ctx.lineTo(refractoryX, padT + plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(239,68,68,0.5)";
+    ctx.font = "8px sans-serif";
+    ctx.fillText("2ms", refractoryX + 1, padT + 10);
+
+    // Draw histogram bars
+    values.forEach((val, i) => {
+      const barH = (val / maxVal) * plotH;
+      const x = padL + i * binW;
+      const isi = (i + 0.5) * (maxISI / bins);
+
+      // Color: short ISIs in cyan, medium in green, long in amber
+      if (isi < 10) {
+        ctx.fillStyle = "rgba(6,182,212,0.6)";
+      } else if (isi < 50) {
+        ctx.fillStyle = "rgba(52,211,153,0.5)";
+      } else {
+        ctx.fillStyle = "rgba(251,191,36,0.4)";
+      }
+
+      ctx.fillRect(x, padT + plotH - barH, binW - 0.5, barH);
+    });
+
+    // Axes
+    ctx.strokeStyle = "rgba(100,116,139,0.4)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, padT + plotH);
+    ctx.lineTo(w - padR, padT + plotH);
+    ctx.moveTo(padL, padT);
+    ctx.lineTo(padL, padT + plotH);
+    ctx.stroke();
+
+    // X-axis labels
+    ctx.fillStyle = "rgba(148,163,184,0.6)";
+    ctx.font = "9px monospace";
+    [0, 50, 100, 200, 500].forEach((ms) => {
+      const x = padL + (ms / maxISI) * plotW;
+      ctx.fillText(`${ms}`, x - 6, padT + plotH + 12);
+    });
+    ctx.fillText("ms", w - padR - 12, padT + plotH + 12);
+
+    // Y-axis label
+    ctx.save();
+    ctx.translate(8, padT + plotH / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("Count", -12, 0);
+    ctx.restore();
+  }, []);
+
+  return (
+    <div>
+      <p className="text-xs text-neural-text-muted mb-2">Inter-Spike Interval Distribution (0-500 ms)</p>
+      <canvas ref={canvasRef} width={320} height={160} className="w-full rounded bg-neural-surface-alt border border-neural-border" />
+      <div className="flex items-center justify-between mt-2 text-[10px] text-neural-text-muted">
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-2 rounded bg-red-400/20 border border-red-400/40 inline-block" />
+          Refractory (&lt;2ms)
+        </span>
+        <span>Mean ISI: 18.3 ms</span>
+        <span>CV: 1.12</span>
+      </div>
+    </div>
+  );
+}
+
 function AnalysisVisualization({ job }: { job: AnalysisDetail }) {
   if (job.status === "queued") {
     return (
@@ -572,6 +846,10 @@ function AnalysisVisualization({ job }: { job: AnalysisDetail }) {
           <p className="text-xs text-neural-text-muted">Generating visualization...</p>
         </div>
       );
+    case "Spectral Analysis":
+      return <SpectralAnalysisChart />;
+    case "ISI Analysis":
+      return <ISIAnalysisChart />;
     default:
       return (
         <div className="text-center py-6">
