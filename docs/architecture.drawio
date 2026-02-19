@@ -1,0 +1,536 @@
+<mxfile host="app.diagrams.net" modified="2026-02-19T00:00:00.000Z" agent="Claude Code" version="24.0.0" type="device">
+  <diagram id="cneav5-architecture" name="CNEAv5 System Architecture">
+    <mxGraphModel dx="2800" dy="1800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="3300" pageHeight="2200" math="0" shadow="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ============================================================ -->
+        <!-- TITLE                                                        -->
+        <!-- ============================================================ -->
+        <mxCell id="title" value="&lt;b&gt;CNEAv5 Neural Interfacing Platform&lt;/b&gt;&lt;br&gt;System Architecture Diagram" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=22;fontColor=#1A1A2E;" vertex="1" parent="1">
+          <mxGeometry x="880" y="20" width="540" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="subtitle" value="Docker Compose Orchestration &amp;nbsp;|&amp;nbsp; 14 Services &amp;nbsp;|&amp;nbsp; MCP Agent Architecture &amp;nbsp;|&amp;nbsp; Real-Time Neural Data Pipeline" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=11;fontColor=#666666;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="830" y="75" width="640" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- LEGEND                                                       -->
+        <!-- ============================================================ -->
+        <mxCell id="legend-group" value="&lt;b&gt;Legend&lt;/b&gt;" style="swimlane;startSize=25;fillColor=#F5F5F5;strokeColor=#CCCCCC;rounded=1;arcSize=8;fontSize=11;fontStyle=1;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="2050" y="100" width="220" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="Presentation Layer" style="rounded=1;whiteSpace=wrap;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=9;fontStyle=0;" vertex="1" parent="legend-group">
+          <mxGeometry x="15" y="35" width="130" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="Backend Services" style="rounded=1;whiteSpace=wrap;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=9;fontStyle=0;" vertex="1" parent="legend-group">
+          <mxGeometry x="15" y="63" width="130" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="Agent Cluster" style="rounded=1;whiteSpace=wrap;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=9;fontStyle=0;" vertex="1" parent="legend-group">
+          <mxGeometry x="15" y="91" width="130" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="Data Layer" style="rounded=1;whiteSpace=wrap;fillColor=#FFE6CC;strokeColor=#D6A656;fontSize=9;fontStyle=0;" vertex="1" parent="legend-group">
+          <mxGeometry x="15" y="119" width="130" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" value="Infrastructure" style="rounded=1;whiteSpace=wrap;fillColor=#F0F0F0;strokeColor=#999999;fontSize=9;fontStyle=0;" vertex="1" parent="legend-group">
+          <mxGeometry x="15" y="147" width="130" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6" value="External Systems" style="rounded=1;whiteSpace=wrap;fillColor=#F8CECC;strokeColor=#B85450;fontSize=9;fontStyle=0;" vertex="1" parent="legend-group">
+          <mxGeometry x="15" y="175" width="130" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-arrow1" value="" style="endArrow=classic;html=1;strokeColor=#333333;fontSize=8;" edge="1" parent="legend-group">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="155" y="46" as="sourcePoint" />
+            <mxPoint x="200" y="46" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg-arrow2" value="" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#AE4132;strokeWidth=2;dashed=1;fontSize=8;" edge="1" parent="legend-group">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="155" y="74" as="sourcePoint" />
+            <mxPoint x="200" y="74" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg-label1" value="&lt;font style=&quot;font-size:8px;&quot;&gt;REST/HTTP&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="legend-group">
+          <mxGeometry x="155" y="35" width="60" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-label2" value="&lt;font style=&quot;font-size:8px;&quot;&gt;WebSocket&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="legend-group">
+          <mxGeometry x="155" y="64" width="60" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-arrow3" value="" style="endArrow=classic;html=1;strokeColor=#D4A843;strokeWidth=2;fontSize=8;" edge="1" parent="legend-group">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="155" y="102" as="sourcePoint" />
+            <mxPoint x="200" y="102" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg-label3" value="&lt;font style=&quot;font-size:8px;&quot;&gt;Redis Pub/Sub&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="legend-group">
+          <mxGeometry x="155" y="93" width="70" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-arrow4" value="" style="endArrow=classic;html=1;strokeColor=#2E7D32;strokeWidth=2;dashed=1;dashPattern=5 2;fontSize=8;" edge="1" parent="legend-group">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="155" y="130" as="sourcePoint" />
+            <mxPoint x="200" y="130" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg-label4" value="&lt;font style=&quot;font-size:8px;&quot;&gt;SQL/Data&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="legend-group">
+          <mxGeometry x="155" y="122" width="60" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-arrow5" value="" style="endArrow=classic;html=1;strokeColor=#7B1FA2;strokeWidth=2;fontSize=8;" edge="1" parent="legend-group">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="155" y="158" as="sourcePoint" />
+            <mxPoint x="200" y="158" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg-label5" value="&lt;font style=&quot;font-size:8px;&quot;&gt;MCP&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="legend-group">
+          <mxGeometry x="155" y="150" width="60" height="16" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- EXTERNAL SYSTEMS (top-left and top-right)                    -->
+        <!-- ============================================================ -->
+        <mxCell id="ext-group" value="&lt;b&gt;External Systems&lt;/b&gt;" style="swimlane;startSize=25;fillColor=#FFF5F5;strokeColor=#B85450;rounded=1;arcSize=8;fontSize=12;fontStyle=1;shadow=1;swimlaneLine=1;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="50" y="120" width="360" height="220" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fpga" value="&lt;b&gt;FPGA Hardware&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Neural Interface Board&lt;br&gt;ADC / DAC / Electrodes&lt;br&gt;Real-time Data Acquisition&lt;/font&gt;" style="shape=hexagon;perimeter=hexagonPerimeter2;size=0.15;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;rounded=1;shadow=1;fontSize=10;fontColor=#333333;" vertex="1" parent="ext-group">
+          <mxGeometry x="20" y="40" width="160" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ollama" value="&lt;b&gt;Ollama&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Local LLM Inference&lt;br&gt;llama3 / mistral&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;shadow=1;fontSize=10;fontColor=#333333;" vertex="1" parent="ext-group">
+          <mxGeometry x="200" y="40" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="openai" value="&lt;b&gt;OpenAI / Anthropic&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Cloud LLM APIs&lt;br&gt;GPT-4 / Claude&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;shadow=1;fontSize=10;fontColor=#333333;" vertex="1" parent="ext-group">
+          <mxGeometry x="200" y="115" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="email-ext" value="&lt;b&gt;Email / SMTP&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Notifications&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;shadow=1;fontSize=10;fontColor=#333333;" vertex="1" parent="ext-group">
+          <mxGeometry x="20" y="140" width="140" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="user-browser" value="&lt;b&gt;User Browser&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;HTTPS Client&lt;/font&gt;" style="shape=actor;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;shadow=1;fontSize=10;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="140" y="370" width="80" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- INFRASTRUCTURE LAYER - NGINX                                 -->
+        <!-- ============================================================ -->
+        <mxCell id="infra-group" value="&lt;b&gt;Infrastructure Layer&lt;/b&gt;  (Docker Compose)" style="swimlane;startSize=28;fillColor=#FAFAFA;strokeColor=#999999;rounded=1;arcSize=6;fontSize=13;fontStyle=1;shadow=1;swimlaneLine=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="350" width="2000" height="1380" as="geometry" />
+        </mxCell>
+
+        <!-- NGINX -->
+        <mxCell id="nginx" value="&lt;b style=&quot;font-size:13px;&quot;&gt;Nginx&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;SSL Reverse Proxy&lt;br&gt;&lt;b&gt;:3025&lt;/b&gt; (HTTPS) + &lt;b&gt;:80&lt;/b&gt; (HTTP redirect)&lt;br&gt;&lt;hr style=&quot;margin:3px 0;&quot;&gt;/ → Frontend&lt;br&gt;/api/ → BFF&lt;br&gt;/ws/ → BFF (WebSocket)&lt;br&gt;/admin/ → Django&lt;br&gt;/mcp/ → Django&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8E8E8;strokeColor=#666666;shadow=1;fontSize=10;fontColor=#333333;arcSize=10;verticalAlign=top;spacingTop=5;" vertex="1" parent="infra-group">
+          <mxGeometry x="30" y="50" width="200" height="170" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- PRESENTATION LAYER                                           -->
+        <!-- ============================================================ -->
+        <mxCell id="presentation-group" value="&lt;b&gt;Presentation Layer&lt;/b&gt;" style="swimlane;startSize=25;fillColor=#EDF2FA;strokeColor=#6C8EBF;rounded=1;arcSize=8;fontSize=12;fontStyle=1;shadow=1;swimlaneLine=1;" vertex="1" parent="infra-group">
+          <mxGeometry x="300" y="40" width="440" height="290" as="geometry" />
+        </mxCell>
+
+        <mxCell id="react" value="&lt;b style=&quot;font-size:13px;&quot;&gt;React Frontend&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Vite + TypeScript&lt;br&gt;Internal Port &lt;b&gt;:80&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;shadow=1;fontSize=10;fontColor=#333333;arcSize=12;verticalAlign=top;spacingTop=5;" vertex="1" parent="presentation-group">
+          <mxGeometry x="20" y="35" width="400" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="react-pages" value="&lt;table style=&quot;font-size:9px;border-collapse:collapse;width:100%;&quot;&gt;&lt;tr&gt;&lt;td style=&quot;padding:3px 6px;background:#C5DBF7;border:1px solid #6C8EBF;text-align:center;&quot;&gt;&lt;b&gt;Dashboard&lt;/b&gt;&lt;/td&gt;&lt;td style=&quot;padding:3px 6px;background:#C5DBF7;border:1px solid #6C8EBF;text-align:center;&quot;&gt;&lt;b&gt;Visualization&lt;/b&gt;&lt;br&gt;Heatmap | Raster&lt;br&gt;Spectrum | Waveform&lt;/td&gt;&lt;td style=&quot;padding:3px 6px;background:#C5DBF7;border:1px solid #6C8EBF;text-align:center;&quot;&gt;&lt;b&gt;Controls&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td style=&quot;padding:3px 6px;background:#C5DBF7;border:1px solid #6C8EBF;text-align:center;&quot;&gt;&lt;b&gt;Recording&lt;br&gt;Browser&lt;/b&gt;&lt;/td&gt;&lt;td style=&quot;padding:3px 6px;background:#C5DBF7;border:1px solid #6C8EBF;text-align:center;&quot;&gt;&lt;b&gt;Experiments&lt;/b&gt;&lt;/td&gt;&lt;td style=&quot;padding:3px 6px;background:#C5DBF7;border:1px solid #6C8EBF;text-align:center;&quot;&gt;&lt;b&gt;Chat&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;shadow=0;fontSize=9;fontColor=#333333;arcSize=8;overflow=fill;" vertex="1" parent="presentation-group">
+          <mxGeometry x="20" y="115" width="400" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="redux" value="&lt;b&gt;Redux Toolkit&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;recording | config | visualization | agents | chat&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B3D1F7;strokeColor=#6C8EBF;shadow=0;fontSize=9;fontColor=#333333;arcSize=10;" vertex="1" parent="presentation-group">
+          <mxGeometry x="20" y="215" width="260" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="auth-ctx" value="&lt;b&gt;AuthContext&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;JWT Auth&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B3D1F7;strokeColor=#6C8EBF;shadow=0;fontSize=9;fontColor=#333333;arcSize=10;" vertex="1" parent="presentation-group">
+          <mxGeometry x="295" y="215" width="125" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- BFF LAYER                                                    -->
+        <!-- ============================================================ -->
+        <mxCell id="bff-group" value="&lt;b&gt;API Gateway / BFF&lt;/b&gt;" style="swimlane;startSize=25;fillColor=#E8F5E9;strokeColor=#82B366;rounded=1;arcSize=8;fontSize=12;fontStyle=1;shadow=1;swimlaneLine=1;" vertex="1" parent="infra-group">
+          <mxGeometry x="300" y="370" width="440" height="220" as="geometry" />
+        </mxCell>
+
+        <mxCell id="bff" value="&lt;b style=&quot;font-size:13px;&quot;&gt;Node.js BFF&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Express + Socket.io&lt;br&gt;Port &lt;b&gt;:3026&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;shadow=1;fontSize=10;fontColor=#333333;arcSize=12;verticalAlign=top;spacingTop=5;" vertex="1" parent="bff-group">
+          <mxGeometry x="20" y="35" width="400" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="ws-channels" value="&lt;b&gt;WebSocket Channels&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;recording:data | recording:spikes | chat:message | agents:status | visualization:stream&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#82B366;shadow=0;fontSize=9;fontColor=#333333;arcSize=8;" vertex="1" parent="bff-group">
+          <mxGeometry x="20" y="105" width="400" height="45" as="geometry" />
+        </mxCell>
+
+        <mxCell id="bff-features" value="&lt;font style=&quot;font-size:8px;&quot;&gt;&lt;b&gt;REST Proxy to Django&lt;/b&gt; &amp;nbsp;|&amp;nbsp; &lt;b&gt;Redis Pub/Sub Relay&lt;/b&gt; &amp;nbsp;|&amp;nbsp; &lt;b&gt;Real-time Data Streaming&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#82B366;shadow=0;fontSize=9;fontColor=#333333;arcSize=8;" vertex="1" parent="bff-group">
+          <mxGeometry x="20" y="160" width="400" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- BACKEND LAYER - DJANGO                                       -->
+        <!-- ============================================================ -->
+        <mxCell id="backend-group" value="&lt;b&gt;Backend Services&lt;/b&gt;" style="swimlane;startSize=25;fillColor=#E8F5E9;strokeColor=#82B366;rounded=1;arcSize=8;fontSize=12;fontStyle=1;shadow=1;swimlaneLine=1;" vertex="1" parent="infra-group">
+          <mxGeometry x="300" y="630" width="440" height="310" as="geometry" />
+        </mxCell>
+
+        <mxCell id="django" value="&lt;b style=&quot;font-size:13px;&quot;&gt;Django Backend&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Daphne / ASGI + Django Channels&lt;br&gt;Port &lt;b&gt;:8085&lt;/b&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;shadow=1;fontSize=10;fontColor=#333333;arcSize=12;verticalAlign=top;spacingTop=5;" vertex="1" parent="backend-group">
+          <mxGeometry x="20" y="35" width="400" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="django-rest" value="&lt;b&gt;REST API&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;/api/recordings/ &amp;nbsp;|&amp;nbsp; /api/experiments/&lt;br&gt;/api/config/ &amp;nbsp;|&amp;nbsp; /api/auth/&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#82B366;shadow=0;fontSize=9;fontColor=#333333;arcSize=8;" vertex="1" parent="backend-group">
+          <mxGeometry x="20" y="105" width="185" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="django-mcp" value="&lt;b&gt;MCP Server&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;/mcp/ endpoint&lt;br&gt;Agent Tool Registration&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#82B366;shadow=0;fontSize=9;fontColor=#333333;arcSize=8;" vertex="1" parent="backend-group">
+          <mxGeometry x="220" y="105" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="django-channels" value="&lt;b&gt;Django Channels&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;WebSocket Consumers&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#82B366;shadow=0;fontSize=9;fontColor=#333333;arcSize=8;" vertex="1" parent="backend-group">
+          <mxGeometry x="20" y="180" width="185" height="45" as="geometry" />
+        </mxCell>
+
+        <mxCell id="celery" value="&lt;b&gt;Celery Workers&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;Task Queue (via Redis)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#82B366;shadow=0;fontSize=9;fontColor=#333333;arcSize=8;" vertex="1" parent="backend-group">
+          <mxGeometry x="220" y="180" width="200" height="45" as="geometry" />
+        </mxCell>
+
+        <mxCell id="django-admin" value="&lt;b&gt;Django Admin&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;/admin/ interface&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#82B366;shadow=0;fontSize=9;fontColor=#333333;arcSize=8;" vertex="1" parent="backend-group">
+          <mxGeometry x="20" y="240" width="185" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- AGENT CLUSTER                                                -->
+        <!-- ============================================================ -->
+        <mxCell id="agent-group" value="&lt;b&gt;FastAPI Agent Cluster&lt;/b&gt;  (7 Microservices)" style="swimlane;startSize=28;fillColor=#F3E8F9;strokeColor=#9673A6;rounded=1;arcSize=8;fontSize=12;fontStyle=1;shadow=1;swimlaneLine=1;" vertex="1" parent="infra-group">
+          <mxGeometry x="810" y="40" width="1150" height="560" as="geometry" />
+        </mxCell>
+
+        <!-- Row 1: Data Acquisition, Signal Processing, Hardware Control -->
+        <mxCell id="agent-daq" value="&lt;b style=&quot;font-size:11px;&quot;&gt;Data Acquisition&lt;br&gt;Agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Port &lt;b&gt;:8088&lt;/b&gt;&lt;br&gt;&lt;hr style=&quot;margin:3px 0;&quot;&gt;FPGA Communication&lt;br&gt;Real-time Data Streaming&lt;br&gt;ADC Sample Capture&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;shadow=1;fontSize=10;fontColor=#333333;arcSize=10;verticalAlign=top;spacingTop=5;" vertex="1" parent="agent-group">
+          <mxGeometry x="20" y="45" width="200" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="agent-signal" value="&lt;b style=&quot;font-size:11px;&quot;&gt;Signal Processing&lt;br&gt;Agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Port &lt;b&gt;:8089&lt;/b&gt;&lt;br&gt;&lt;hr style=&quot;margin:3px 0;&quot;&gt;Spike Detection&lt;br&gt;Band-pass Filtering&lt;br&gt;FFT Analysis&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;shadow=1;fontSize=10;fontColor=#333333;arcSize=10;verticalAlign=top;spacingTop=5;" vertex="1" parent="agent-group">
+          <mxGeometry x="240" y="45" width="200" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="agent-hw" value="&lt;b style=&quot;font-size:11px;&quot;&gt;Hardware Control&lt;br&gt;Agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Port &lt;b&gt;:8090&lt;/b&gt;&lt;br&gt;&lt;hr style=&quot;margin:3px 0;&quot;&gt;FPGA Configuration&lt;br&gt;Bias / Clock / TIA Params&lt;br&gt;Register Read/Write&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;shadow=1;fontSize=10;fontColor=#333333;arcSize=10;verticalAlign=top;spacingTop=5;" vertex="1" parent="agent-group">
+          <mxGeometry x="460" y="45" width="200" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="agent-storage" value="&lt;b style=&quot;font-size:11px;&quot;&gt;Storage Agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Port &lt;b&gt;:8091&lt;/b&gt;&lt;br&gt;&lt;hr style=&quot;margin:3px 0;&quot;&gt;Recording File Mgmt&lt;br&gt;Data Export (HDF5/CSV)&lt;br&gt;File I/O Operations&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;shadow=1;fontSize=10;fontColor=#333333;arcSize=10;verticalAlign=top;spacingTop=5;" vertex="1" parent="agent-group">
+          <mxGeometry x="680" y="45" width="200" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- Row 2: AI/ML, Notification, LLM -->
+        <mxCell id="agent-aiml" value="&lt;b style=&quot;font-size:11px;&quot;&gt;AI/ML Agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Port &lt;b&gt;:8092&lt;/b&gt;&lt;br&gt;&lt;hr style=&quot;margin:3px 0;&quot;&gt;Spike Sorting&lt;br&gt;Pattern Recognition&lt;br&gt;Clustering Algorithms&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;shadow=1;fontSize=10;fontColor=#333333;arcSize=10;verticalAlign=top;spacingTop=5;" vertex="1" parent="agent-group">
+          <mxGeometry x="20" y="215" width="200" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="agent-notify" value="&lt;b style=&quot;font-size:11px;&quot;&gt;Notification Agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Port &lt;b&gt;:8093&lt;/b&gt;&lt;br&gt;&lt;hr style=&quot;margin:3px 0;&quot;&gt;Alert Management&lt;br&gt;Threshold Monitoring&lt;br&gt;Email Notifications&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;shadow=1;fontSize=10;fontColor=#333333;arcSize=10;verticalAlign=top;spacingTop=5;" vertex="1" parent="agent-group">
+          <mxGeometry x="240" y="215" width="200" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="agent-llm" value="&lt;b style=&quot;font-size:11px;&quot;&gt;LLM Agent&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Port &lt;b&gt;:8094&lt;/b&gt;&lt;br&gt;&lt;hr style=&quot;margin:3px 0;&quot;&gt;LangGraph Chatbot&lt;br&gt;RAG Pipeline&lt;br&gt;Ollama / OpenAI / Anthropic&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CE93D8;strokeColor=#7B1FA2;shadow=1;fontSize=10;fontColor=#333333;arcSize=10;verticalAlign=top;spacingTop=5;" vertex="1" parent="agent-group">
+          <mxGeometry x="460" y="215" width="220" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- LLM Agent sub-components -->
+        <mxCell id="langgraph" value="&lt;b&gt;LangGraph&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;State Machine&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BA68C8;strokeColor=#7B1FA2;shadow=0;fontSize=9;fontColor=#FFFFFF;arcSize=12;" vertex="1" parent="agent-group">
+          <mxGeometry x="700" y="225" width="110" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rag" value="&lt;b&gt;RAG Pipeline&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;pgvector Embeddings&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BA68C8;strokeColor=#7B1FA2;shadow=0;fontSize=9;fontColor=#FFFFFF;arcSize=12;" vertex="1" parent="agent-group">
+          <mxGeometry x="700" y="275" width="110" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="llm-conn-langgraph" value="" style="endArrow=classic;html=1;strokeColor=#7B1FA2;entryX=0;entryY=0.5;exitX=1;exitY=0.3;" edge="1" parent="agent-group" source="agent-llm" target="langgraph">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="llm-conn-rag" value="" style="endArrow=classic;html=1;strokeColor=#7B1FA2;entryX=0;entryY=0.5;exitX=1;exitY=0.7;" edge="1" parent="agent-group" source="agent-llm" target="rag">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Langfuse -->
+        <mxCell id="langfuse" value="&lt;b style=&quot;font-size:11px;&quot;&gt;Langfuse&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Port &lt;b&gt;:8095&lt;/b&gt;&lt;br&gt;&lt;hr style=&quot;margin:3px 0;&quot;&gt;LLM Observability&lt;br&gt;Tracing &amp;amp; Analytics&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;shadow=1;fontSize=10;fontColor=#333333;arcSize=10;verticalAlign=top;spacingTop=5;" vertex="1" parent="agent-group">
+          <mxGeometry x="900" y="215" width="200" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- MCP Pattern box -->
+        <mxCell id="mcp-pattern" value="&lt;b&gt;MCP (Model Context Protocol)&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;All agents register tools via MCP&lt;br&gt;Django acts as MCP server/router&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#CE93D8;shadow=0;fontSize=9;fontColor=#7B1FA2;arcSize=8;dashed=1;dashPattern=5 3;" vertex="1" parent="agent-group">
+          <mxGeometry x="20" y="395" width="430" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Design patterns box -->
+        <mxCell id="patterns-box" value="&lt;b&gt;Key Design Patterns&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;Redis Pub/Sub for inter-service communication&lt;br&gt;LangGraph state machine for LLM orchestration&lt;br&gt;RAG with pgvector embeddings&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#CE93D8;shadow=0;fontSize=9;fontColor=#7B1FA2;arcSize=8;dashed=1;dashPattern=5 3;" vertex="1" parent="agent-group">
+          <mxGeometry x="480" y="395" width="430" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Internal agent connection: DAQ -> Signal Processing -->
+        <mxCell id="daq-to-signal" value="&lt;font style=&quot;font-size:8px;&quot;&gt;Redis Pub/Sub&lt;br&gt;raw neural data&lt;/font&gt;" style="endArrow=classic;html=1;strokeColor=#D4A843;strokeWidth=2;entryX=0;entryY=0.5;exitX=1;exitY=0.5;" edge="1" parent="agent-group" source="agent-daq" target="agent-signal">
+          <mxGeometry x="0.0" y="10" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Signal -> AI/ML -->
+        <mxCell id="signal-to-aiml" value="&lt;font style=&quot;font-size:8px;&quot;&gt;Redis Pub/Sub&lt;br&gt;filtered signals&lt;/font&gt;" style="endArrow=classic;html=1;strokeColor=#D4A843;strokeWidth=2;exitX=0.25;exitY=1;entryX=0.75;entryY=0;" edge="1" parent="agent-group" source="agent-signal" target="agent-aiml">
+          <mxGeometry x="-0.2" y="-15" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- LLM -> Langfuse -->
+        <mxCell id="llm-to-langfuse" value="&lt;font style=&quot;font-size:8px;&quot;&gt;HTTP&lt;br&gt;traces&lt;/font&gt;" style="endArrow=classic;html=1;strokeColor=#333333;entryX=0;entryY=0.5;exitX=1;exitY=0.5;" edge="1" parent="agent-group">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="820" y="295" as="sourcePoint" />
+            <mxPoint x="900" y="295" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- DATA LAYER                                                   -->
+        <!-- ============================================================ -->
+        <mxCell id="data-group" value="&lt;b&gt;Data Layer&lt;/b&gt;" style="swimlane;startSize=25;fillColor=#FFF8E1;strokeColor=#D6A656;rounded=1;arcSize=8;fontSize=12;fontStyle=1;shadow=1;swimlaneLine=1;" vertex="1" parent="infra-group">
+          <mxGeometry x="300" y="980" width="700" height="370" as="geometry" />
+        </mxCell>
+
+        <!-- PostgreSQL + TimescaleDB -->
+        <mxCell id="postgres" value="&lt;b style=&quot;font-size:13px;&quot;&gt;PostgreSQL + TimescaleDB&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Port &lt;b&gt;:5435&lt;/b&gt;&lt;/font&gt;" style="shape=cylinder3;size=10;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D6A656;shadow=1;fontSize=10;fontColor=#333333;boundedLbl=1;" vertex="1" parent="data-group">
+          <mxGeometry x="20" y="40" width="300" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pg-tables" value="&lt;table style=&quot;font-size:8px;border-collapse:collapse;width:100%;&quot;&gt;&lt;tr&gt;&lt;td style=&quot;padding:2px 5px;background:#FFD699;border:1px solid #D6A656;&quot;&gt;&lt;b&gt;recordings&lt;/b&gt;&lt;/td&gt;&lt;td style=&quot;padding:2px 5px;background:#FFD699;border:1px solid #D6A656;&quot;&gt;&lt;b&gt;experiments&lt;/b&gt;&lt;/td&gt;&lt;td style=&quot;padding:2px 5px;background:#FFD699;border:1px solid #D6A656;&quot;&gt;&lt;b&gt;electrode_config&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td style=&quot;padding:2px 5px;background:#FFEACC;border:1px solid #D6A656;&quot;&gt;&lt;b&gt;neural_data&lt;/b&gt;&lt;br&gt;(hypertable)&lt;/td&gt;&lt;td style=&quot;padding:2px 5px;background:#FFEACC;border:1px solid #D6A656;&quot;&gt;&lt;b&gt;spike_events&lt;/b&gt;&lt;/td&gt;&lt;td style=&quot;padding:2px 5px;background:#FFEACC;border:1px solid #D6A656;&quot;&gt;&lt;b&gt;...more&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D6A656;shadow=0;overflow=fill;arcSize=6;" vertex="1" parent="data-group">
+          <mxGeometry x="20" y="135" width="300" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="pgvector" value="&lt;b&gt;pgvector Extension&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;LLM Embeddings Storage&lt;br&gt;Vector Similarity Search&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFD699;strokeColor=#D6A656;shadow=0;fontSize=9;fontColor=#333333;arcSize=8;" vertex="1" parent="data-group">
+          <mxGeometry x="20" y="220" width="300" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- Redis -->
+        <mxCell id="redis" value="&lt;b style=&quot;font-size:13px;&quot;&gt;Redis 7&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;Port &lt;b&gt;:6385&lt;/b&gt;&lt;/font&gt;" style="shape=cylinder3;size=10;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D6A656;shadow=1;fontSize=10;fontColor=#333333;boundedLbl=1;" vertex="1" parent="data-group">
+          <mxGeometry x="400" y="40" width="260" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="redis-features" value="&lt;table style=&quot;font-size:8px;border-collapse:collapse;width:100%;&quot;&gt;&lt;tr&gt;&lt;td style=&quot;padding:3px 6px;background:#FFD699;border:1px solid #D6A656;text-align:center;&quot;&gt;&lt;b&gt;Pub/Sub&lt;/b&gt;&lt;br&gt;Message Broker&lt;/td&gt;&lt;td style=&quot;padding:3px 6px;background:#FFD699;border:1px solid #D6A656;text-align:center;&quot;&gt;&lt;b&gt;Channel Layer&lt;/b&gt;&lt;br&gt;Django Channels&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td style=&quot;padding:3px 6px;background:#FFEACC;border:1px solid #D6A656;text-align:center;&quot;&gt;&lt;b&gt;Cache&lt;/b&gt;&lt;br&gt;Response Cache&lt;/td&gt;&lt;td style=&quot;padding:3px 6px;background:#FFEACC;border:1px solid #D6A656;text-align:center;&quot;&gt;&lt;b&gt;Sessions&lt;/b&gt;&lt;br&gt;Session Storage&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D6A656;shadow=0;overflow=fill;arcSize=6;" vertex="1" parent="data-group">
+          <mxGeometry x="400" y="135" width="260" height="85" as="geometry" />
+        </mxCell>
+
+        <mxCell id="redis-celery" value="&lt;b&gt;Celery Broker&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;&quot;&gt;Task Queue Backend&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFD699;strokeColor=#D6A656;shadow=0;fontSize=9;fontColor=#333333;arcSize=8;" vertex="1" parent="data-group">
+          <mxGeometry x="400" y="235" width="260" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- CONNECTION ARROWS - Major Data Flows                         -->
+        <!-- ============================================================ -->
+
+        <!-- User Browser → Nginx (HTTPS) -->
+        <mxCell id="conn-user-nginx" value="&lt;font style=&quot;font-size:9px;&quot;&gt;&lt;b&gt;HTTPS :3025&lt;/b&gt;&lt;/font&gt;" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#333333;strokeWidth=2;entryX=0;entryY=0.35;exitX=1;exitY=0.5;" edge="1" parent="1" source="user-browser" target="nginx">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="230" y="410" as="sourcePoint" />
+            <mxPoint x="310" y="460" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Nginx → React (/) -->
+        <mxCell id="conn-nginx-react" value="&lt;font style=&quot;font-size:8px;&quot;&gt;HTTP /&lt;/font&gt;" style="endArrow=classic;html=1;strokeColor=#333333;strokeWidth=1.5;exitX=1;exitY=0.2;entryX=0;entryY=0.5;" edge="1" parent="infra-group" source="nginx" target="react">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Nginx → BFF (/api/, /ws/) -->
+        <mxCell id="conn-nginx-bff" value="&lt;font style=&quot;font-size:8px;&quot;&gt;HTTP /api/&lt;br&gt;WS /ws/&lt;/font&gt;" style="endArrow=classic;html=1;strokeColor=#333333;strokeWidth=1.5;exitX=1;exitY=0.55;entryX=0;entryY=0.3;" edge="1" parent="infra-group" source="nginx" target="bff">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Nginx → Django (/admin/, /mcp/) -->
+        <mxCell id="conn-nginx-django" value="&lt;font style=&quot;font-size:8px;&quot;&gt;HTTP /admin/&lt;br&gt;HTTP /mcp/&lt;/font&gt;" style="endArrow=classic;html=1;strokeColor=#333333;strokeWidth=1.5;exitX=1;exitY=0.85;entryX=0;entryY=0.3;" edge="1" parent="infra-group" source="nginx" target="django">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="260" y="195" />
+              <mxPoint x="260" y="685" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- React ↔ BFF (WebSocket) -->
+        <mxCell id="conn-react-bff-ws" value="&lt;font style=&quot;font-size:8px;color:#AE4132;&quot;&gt;&lt;b&gt;WebSocket&lt;/b&gt;&lt;br&gt;Socket.io&lt;/font&gt;" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#AE4132;strokeWidth=2;dashed=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;exitDx=0;exitDy=0;entryDx=0;entryDy=0;" edge="1" parent="infra-group" source="presentation-group" target="bff-group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- BFF → Django (REST proxy) -->
+        <mxCell id="conn-bff-django" value="&lt;font style=&quot;font-size:8px;&quot;&gt;&lt;b&gt;HTTP&lt;/b&gt;&lt;br&gt;REST Proxy&lt;/font&gt;" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#333333;strokeWidth=1.5;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="infra-group" source="bff-group" target="backend-group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- BFF ↔ Redis (Pub/Sub) -->
+        <mxCell id="conn-bff-redis" value="&lt;font style=&quot;font-size:8px;color:#D4A843;&quot;&gt;&lt;b&gt;Redis Pub/Sub&lt;/b&gt;&lt;br&gt;Real-time Relay&lt;/font&gt;" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#D4A843;strokeWidth=2;exitX=1;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="infra-group" source="bff-group" target="redis">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="830" y="600" />
+              <mxPoint x="830" y="960" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Django → PostgreSQL (SQL) -->
+        <mxCell id="conn-django-pg" value="&lt;font style=&quot;font-size:8px;color:#2E7D32;&quot;&gt;&lt;b&gt;SQL&lt;/b&gt;&lt;br&gt;ORM Queries&lt;/font&gt;" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#2E7D32;strokeWidth=2;dashed=1;dashPattern=5 2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="infra-group" source="backend-group" target="data-group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Django → Redis (Channel Layer + Celery) -->
+        <mxCell id="conn-django-redis" value="&lt;font style=&quot;font-size:8px;color:#D4A843;&quot;&gt;&lt;b&gt;Redis&lt;/b&gt;&lt;br&gt;Channel Layer&lt;br&gt;Celery Broker&lt;/font&gt;" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#D4A843;strokeWidth=2;exitX=1;exitY=0.85;entryX=0;entryY=0.5;" edge="1" parent="infra-group" source="backend-group" target="redis">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="770" y="890" />
+              <mxPoint x="770" y="1070" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Django ↔ Agents (MCP) -->
+        <mxCell id="conn-django-agents" value="&lt;font style=&quot;font-size:9px;color:#7B1FA2;&quot;&gt;&lt;b&gt;MCP Protocol&lt;/b&gt;&lt;br&gt;Tool Registration &amp;amp; Invocation&lt;/font&gt;" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#7B1FA2;strokeWidth=2;exitX=0.5;exitY=0;entryX=0.2;entryY=1;" edge="1" parent="infra-group" source="backend-group" target="agent-group">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="520" y="617" />
+              <mxPoint x="1040" y="617" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Agents → Redis (Pub/Sub) -->
+        <mxCell id="conn-agents-redis" value="&lt;font style=&quot;font-size:8px;color:#D4A843;&quot;&gt;&lt;b&gt;Redis Pub/Sub&lt;/b&gt;&lt;br&gt;Inter-service Comm&lt;/font&gt;" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#D4A843;strokeWidth=2;exitX=0.85;exitY=1;entryX=1;entryY=0;" edge="1" parent="infra-group" source="agent-group" target="redis">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1800" y="620" />
+              <mxPoint x="1800" y="960" />
+              <mxPoint x="830" y="960" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Agents → PostgreSQL -->
+        <mxCell id="conn-agents-pg" value="&lt;font style=&quot;font-size:8px;color:#2E7D32;&quot;&gt;&lt;b&gt;SQL&lt;/b&gt;&lt;br&gt;Data Storage&lt;/font&gt;" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#2E7D32;strokeWidth=2;dashed=1;dashPattern=5 2;exitX=0.6;exitY=1;entryX=0.85;entryY=0;" edge="1" parent="infra-group" source="agent-group" target="postgres">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1500" y="620" />
+              <mxPoint x="1500" y="950" />
+              <mxPoint x="290" y="950" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- EXTERNAL SYSTEM CONNECTIONS                                  -->
+        <!-- ============================================================ -->
+
+        <!-- FPGA → Data Acquisition Agent -->
+        <mxCell id="conn-fpga-daq" value="&lt;font style=&quot;font-size:9px;&quot;&gt;&lt;b&gt;SPI / USB / PCIe&lt;/b&gt;&lt;br&gt;Raw Neural Data&lt;/font&gt;" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#B85450;strokeWidth=2;exitX=1;exitY=0.5;" edge="1" parent="1" source="fpga">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="300" y="220" as="sourcePoint" />
+            <mxPoint x="1110" y="455" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="500" y="210" />
+              <mxPoint x="1050" y="210" />
+              <mxPoint x="1050" y="370" />
+              <mxPoint x="1050" y="455" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Hardware Control → FPGA -->
+        <mxCell id="conn-hw-fpga" value="&lt;font style=&quot;font-size:8px;&quot;&gt;&lt;b&gt;FPGA Control&lt;/b&gt;&lt;br&gt;Config Commands&lt;/font&gt;" style="endArrow=classic;html=1;strokeColor=#B85450;strokeWidth=1.5;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1550" y="455" as="sourcePoint" />
+            <mxPoint x="250" y="200" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1550" y="370" />
+              <mxPoint x="1550" y="190" />
+              <mxPoint x="500" y="190" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- LLM Agent → Ollama -->
+        <mxCell id="conn-llm-ollama" value="&lt;font style=&quot;font-size:8px;&quot;&gt;&lt;b&gt;HTTP&lt;/b&gt;&lt;br&gt;LLM Inference&lt;/font&gt;" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#B85450;strokeWidth=1.5;" edge="1" parent="1" target="ollama">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1570" y="625" as="sourcePoint" />
+            <mxPoint x="340" y="190" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1570" y="370" />
+              <mxPoint x="1570" y="175" />
+              <mxPoint x="500" y="175" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- LLM Agent → OpenAI/Anthropic -->
+        <mxCell id="conn-llm-openai" value="&lt;font style=&quot;font-size:8px;&quot;&gt;&lt;b&gt;HTTPS&lt;/b&gt;&lt;br&gt;Cloud LLM API&lt;/font&gt;" style="endArrow=classic;startArrow=classic;html=1;strokeColor=#B85450;strokeWidth=1.5;" edge="1" parent="1" target="openai">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1590" y="640" as="sourcePoint" />
+            <mxPoint x="410" y="270" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1590" y="370" />
+              <mxPoint x="1590" y="160" />
+              <mxPoint x="480" y="160" />
+              <mxPoint x="480" y="265" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Notification Agent → Email -->
+        <mxCell id="conn-notify-email" value="&lt;font style=&quot;font-size:8px;&quot;&gt;&lt;b&gt;SMTP&lt;/b&gt;&lt;/font&gt;" style="endArrow=classic;html=1;strokeColor=#B85450;strokeWidth=1.5;" edge="1" parent="1" target="email-ext">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1330" y="625" as="sourcePoint" />
+            <mxPoint x="100" y="310" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1330" y="370" />
+              <mxPoint x="1330" y="145" />
+              <mxPoint x="480" y="145" />
+              <mxPoint x="480" y="290" />
+              <mxPoint x="200" y="290" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- DATA FLOW ANNOTATIONS                                        -->
+        <!-- ============================================================ -->
+        <mxCell id="flow1-title" value="&lt;b&gt;Data Flow 1: Neural Data Pipeline&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=#E3F2FD;strokeColor=#1565C0;rounded=1;arcSize=10;fontSize=10;fontColor=#1565C0;spacingLeft=8;spacingTop=4;spacingRight=8;spacingBottom=4;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="50" y="1800" width="700" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="flow1-desc" value="&lt;font style=&quot;font-size:9px;&quot;&gt;FPGA Hardware → &lt;b&gt;Data Acquisition Agent&lt;/b&gt; → &lt;i&gt;Redis Pub/Sub&lt;/i&gt; → &lt;b&gt;Signal Processing Agent&lt;/b&gt; → &lt;i&gt;Redis Pub/Sub&lt;/i&gt; → &lt;b&gt;Django&lt;/b&gt; → &lt;b&gt;BFF&lt;/b&gt; (WebSocket) → &lt;b&gt;Frontend&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;fontSize=9;fontColor=#333333;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="50" y="1830" width="700" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow2-title" value="&lt;b&gt;Data Flow 2: User Command Pipeline&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=#E8F5E9;strokeColor=#2E7D32;rounded=1;arcSize=10;fontSize=10;fontColor=#2E7D32;spacingLeft=8;spacingTop=4;spacingRight=8;spacingBottom=4;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="50" y="1860" width="700" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="flow2-desc" value="&lt;font style=&quot;font-size:9px;&quot;&gt;User Commands → &lt;b&gt;Frontend&lt;/b&gt; → &lt;b&gt;BFF&lt;/b&gt; → &lt;b&gt;Django REST API&lt;/b&gt; → &lt;i&gt;Agent MCP Tools&lt;/i&gt; → &lt;b&gt;Hardware&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;fontSize=9;fontColor=#333333;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="50" y="1890" width="700" height="25" as="geometry" />
+        </mxCell>
+
+        <mxCell id="flow3-title" value="&lt;b&gt;Data Flow 3: Chat / LLM Pipeline&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=#F3E5F5;strokeColor=#7B1FA2;rounded=1;arcSize=10;fontSize=10;fontColor=#7B1FA2;spacingLeft=8;spacingTop=4;spacingRight=8;spacingBottom=4;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="50" y="1920" width="700" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="flow3-desc" value="&lt;font style=&quot;font-size:9px;&quot;&gt;Frontend → &lt;b&gt;BFF&lt;/b&gt; (WebSocket) → &lt;b&gt;Django&lt;/b&gt; → &lt;b&gt;LLM Agent&lt;/b&gt; (LangGraph) → &lt;i&gt;Ollama / OpenAI / Anthropic&lt;/i&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;fontSize=9;fontColor=#333333;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="50" y="1950" width="700" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================ -->
+        <!-- SERVICE COUNT SUMMARY                                        -->
+        <!-- ============================================================ -->
+        <mxCell id="summary-box" value="&lt;b&gt;Service Summary (14 Docker Containers)&lt;/b&gt;&lt;br&gt;&lt;hr style=&quot;margin:4px 0;&quot;&gt;&lt;font style=&quot;font-size:9px;&quot;&gt;&lt;table style=&quot;width:100%;font-size:9px;border-collapse:collapse;&quot;&gt;&lt;tr&gt;&lt;td&gt;1. Nginx (:3025/:80)&lt;/td&gt;&lt;td&gt;6. Redis (:6385)&lt;/td&gt;&lt;td&gt;11. Storage Agent (:8091)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;2. React Frontend (:80)&lt;/td&gt;&lt;td&gt;7. Data Acq. Agent (:8088)&lt;/td&gt;&lt;td&gt;12. AI/ML Agent (:8092)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;3. Node.js BFF (:3026)&lt;/td&gt;&lt;td&gt;8. Signal Proc. Agent (:8089)&lt;/td&gt;&lt;td&gt;13. Notification Agent (:8093)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;4. Django Backend (:8085)&lt;/td&gt;&lt;td&gt;9. HW Control Agent (:8090)&lt;/td&gt;&lt;td&gt;14. LLM Agent (:8094)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;5. PostgreSQL+TimescaleDB (:5435)&lt;/td&gt;&lt;td&gt;10. Langfuse (:8095)&lt;/td&gt;&lt;td&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#999999;shadow=1;fontSize=10;fontColor=#333333;arcSize=6;align=left;verticalAlign=top;spacingLeft=10;spacingTop=5;spacingRight=10;overflow=fill;" vertex="1" parent="1">
+          <mxGeometry x="800" y="1800" width="600" height="180" as="geometry" />
+        </mxCell>
+
+        <!-- Version / Footer -->
+        <mxCell id="footer" value="&lt;font style=&quot;font-size:9px;color:#999999;&quot;&gt;CNEAv5 Neural Interfacing Platform &amp;nbsp;|&amp;nbsp; Architecture v5.0 &amp;nbsp;|&amp;nbsp; Docker Compose Deployment &amp;nbsp;|&amp;nbsp; Generated 2026-02-19&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="750" y="1990" width="600" height="30" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

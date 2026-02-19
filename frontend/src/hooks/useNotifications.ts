@@ -21,7 +21,8 @@ const MAX_NOTIFICATIONS = 200;
 
 function getWsUrl(): string {
   if (import.meta.env.VITE_WS_URL) {
-    return import.meta.env.VITE_WS_URL + "/ws/notifications";
+    const base = import.meta.env.VITE_WS_URL.replace(/\/+$/, "");
+    return `${base}/ws/notifications`;
   }
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}/ws/notifications`;

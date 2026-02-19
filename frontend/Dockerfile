@@ -9,6 +9,12 @@ COPY package.json package-lock.json* ./
 # Install dependencies
 RUN npm install --frozen-lockfile 2>/dev/null || npm install
 
+# Accept build-time environment variables for Vite
+ARG VITE_API_URL
+ARG VITE_WS_URL
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_URL=$VITE_WS_URL
+
 # Copy source
 COPY . .
 
