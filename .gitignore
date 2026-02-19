@@ -40,6 +40,12 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 
+# SSL certificates (keep .gitkeep only)
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+ssl/*.csr
+
 # Data
 *.h5
 *.hdf5

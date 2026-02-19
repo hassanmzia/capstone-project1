@@ -87,17 +87,33 @@ services:
       - redis
     restart: unless-stopped
 
+  # ============ NGINX (SSL Reverse Proxy) ============
+  nginx:
+    image: nginx:alpine
+    container_name: neural-nginx
+    ports:
+      - "${FRONTEND_PORT:-3025}:3025"
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - bff
+      - django
+    restart: unless-stopped
+
   # ============ REACT FRONTEND ============
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_URL=${VITE_API_URL:-http://172.168.1.95:3026}
-        - VITE_WS_URL=${VITE_WS_URL:-ws://172.168.1.95:3026/ws}
+        - VITE_API_URL=${VITE_API_URL:-/api}
+        - VITE_WS_URL=${VITE_WS_URL:-wss://demo.eminencetechsolutions.com:3025/ws}
     container_name: neural-frontend
-    ports:
-      - "${FRONTEND_PORT:-3025}:80"
+    expose:
+      - "80"
     depends_on:
       - bff
     restart: unless-stopped
