@@ -62,7 +62,7 @@ export default function AnalysisPage() {
   const [analysisJobs] = useState<AnalysisJob[]>(loadAnalysisJobs);
 
   return (
-    <div className="flex flex-col gap-4 h-full">
+    <div className="flex flex-col gap-4 min-h-0 lg:h-full">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2 bg-neural-surface rounded-xl border border-neural-border p-3">
         <div className="flex items-center gap-2 min-w-0">
@@ -78,9 +78,9 @@ export default function AnalysisPage() {
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4 lg:flex-1 lg:min-h-0">
         {/* Analysis types */}
-        <div className="w-full lg:w-80 shrink-0 bg-neural-surface rounded-xl border border-neural-border p-4 overflow-y-auto">
+        <div className="w-full lg:w-80 lg:shrink-0 bg-neural-surface rounded-xl border border-neural-border p-4 lg:overflow-y-auto">
           <h2 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider mb-3">
             Analysis Types
           </h2>
