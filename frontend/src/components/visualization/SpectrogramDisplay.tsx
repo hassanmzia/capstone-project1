@@ -562,8 +562,8 @@ export default function SpectrogramDisplay({
   return (
     <div className={`flex flex-col bg-neural-surface rounded-xl border border-neural-border ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-neural-border">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center flex-wrap gap-2 px-3 py-2 border-b border-neural-border">
+        <div className="flex items-center gap-2 shrink-0">
           <h3 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider">
             Spectrogram
           </h3>
@@ -571,7 +571,7 @@ export default function SpectrogramDisplay({
             CH{channel.toString().padStart(2, "0")}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center flex-wrap gap-2 ml-auto">
           {/* Band overlay toggle */}
           <label className="flex items-center gap-1 cursor-pointer">
             <input

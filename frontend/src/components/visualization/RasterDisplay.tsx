@@ -296,8 +296,8 @@ export default function RasterDisplay({
       className={`relative flex flex-col bg-neural-surface rounded-xl border border-neural-border overflow-hidden ${className}`}
     >
       {/* ── Header bar ── */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-neural-border shrink-0">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center flex-wrap gap-2 px-3 py-1.5 border-b border-neural-border shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <h3 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider">
             Spike Raster
           </h3>
@@ -306,7 +306,7 @@ export default function RasterDisplay({
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto">
           {/* Window size control */}
           <div className="flex items-center gap-1">
             <span className="text-[10px] text-neural-text-muted">Window:</span>

@@ -254,7 +254,7 @@ export default function VisualizationPage() {
         </div>
 
         {/* Playback + visualization controls */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={() => dispatch(togglePause())}
             className={`p-1.5 rounded-lg neural-transition ${

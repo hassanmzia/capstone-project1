@@ -427,7 +427,7 @@ export default function SpikeHeatmap({
         {/* Tooltip */}
         {tooltip && (
           <div
-            className="absolute pointer-events-none bg-neural-surface-alt/95 border border-neural-border rounded-lg shadow-lg px-2.5 py-2 text-xs z-20 whitespace-nowrap"
+            className="absolute pointer-events-none bg-neural-surface-alt/95 border border-neural-border rounded-lg shadow-lg px-2.5 py-2 text-xs z-20 max-w-[200px]"
             style={{
               left: Math.min(tooltip.x + 16, (containerRef.current?.clientWidth ?? 200) - 150),
               top: Math.max(tooltip.y - 60, 4),

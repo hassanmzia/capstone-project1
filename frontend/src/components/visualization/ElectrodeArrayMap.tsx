@@ -368,8 +368,8 @@ export default function ElectrodeArrayMap({
         {/* Context menu */}
         {contextMenu.visible && (
           <div
-            className="absolute bg-neural-surface-alt border border-neural-border rounded-lg shadow-xl z-30 py-1 min-w-[160px]"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
+            className="absolute bg-neural-surface-alt border border-neural-border rounded-lg shadow-xl z-30 py-1 min-w-[140px] max-w-[calc(100%-8px)]"
+            style={{ left: Math.min(contextMenu.x, (svgRef.current?.clientWidth ?? 300) - 150), top: contextMenu.y }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-3 py-1.5 text-xs font-semibold text-neural-text-secondary border-b border-neural-border">
