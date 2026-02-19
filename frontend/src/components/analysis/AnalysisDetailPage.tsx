@@ -14,6 +14,7 @@ import {
   Cpu,
   Activity,
   Zap,
+  LayoutDashboard,
 } from "lucide-react";
 
 interface AnalysisDetail {
@@ -51,6 +52,18 @@ function buildDetailFromStoredJob(raw: {
   const startedAt = new Date(now.getTime() - durMinutes * 60000).toISOString().slice(0, 16).replace("T", " ");
 
   const paramTemplates: Record<string, { label: string; value: string }[]> = {
+    "Combined Analysis": [
+      { label: "Mode", value: "Unified (all 6 analysis types)" },
+      { label: "Spike Algorithm", value: "Kilosort 3" },
+      { label: "Detection Threshold", value: "6.0 std" },
+      { label: "Burst Algorithm", value: "LogISI" },
+      { label: "Min Burst Spikes", value: "3" },
+      { label: "PCA Components", value: "3" },
+      { label: "CC Bin Size", value: "0.5 ms" },
+      { label: "ISI Bin Size", value: "1 ms" },
+      { label: "FFT Window", value: "Hanning" },
+      { label: "Spectral Overlap", value: "50%" },
+    ],
     "Spike Sorting": [
       { label: "Algorithm", value: "Kilosort 3" },
       { label: "Threshold", value: "6.0 std" },
@@ -88,6 +101,15 @@ function buildDetailFromStoredJob(raw: {
   };
 
   const outputTemplates: Record<string, { label: string; value: string }[]> = {
+    "Combined Analysis": [
+      { label: "Analyses Run", value: "6 of 6" },
+      { label: "Spike Units", value: raw.result.match(/[\d,]+ units/)?.[0]?.split(" ")[0] || "2,841" },
+      { label: "Bursts Detected", value: raw.result.match(/(\d+) bursts/)?.[1] || "142" },
+      { label: "PCA Variance", value: raw.result.match(/([\d.]+)% PCA/)?.[1] ? `${raw.result.match(/([\d.]+)% PCA/)?.[1]}%` : "85.2%" },
+      { label: "Significant CC Pairs", value: "48" },
+      { label: "Mean ISI", value: "18.3 ms" },
+      { label: "Peak Frequency", value: "6.2 Hz (theta)" },
+    ],
     "Spike Sorting": [
       { label: "Total Units", value: raw.result.split(" ")[0] || "—" },
       { label: "Isolation Score", value: "0.87 (median)" },
@@ -154,6 +176,45 @@ function findAnalysisJob(id: string): AnalysisDetail | null {
 }
 
 const mockAnalysisDb: Record<string, AnalysisDetail> = {
+  "a-005": {
+    id: "a-005",
+    type: "Combined Analysis",
+    recording: "session_042",
+    experimentName: "Hippocampal CA1 Place Cell Study",
+    status: "completed",
+    progress: 100,
+    duration: "18m 47s",
+    result: "6 analyses completed — 3,847 units, 142 bursts, 85.2% PCA variance",
+    startedAt: "2026-02-19 08:00",
+    completedAt: "2026-02-19 08:19",
+    parameters: [
+      { label: "Mode", value: "Unified (all 6 analysis types)" },
+      { label: "Spike Algorithm", value: "Kilosort 3" },
+      { label: "Detection Threshold", value: "6.0 std" },
+      { label: "Min Cluster Size", value: "30 spikes" },
+      { label: "Burst Algorithm", value: "LogISI" },
+      { label: "Min Burst Spikes", value: "3" },
+      { label: "Max ISI (intra-burst)", value: "10 ms" },
+      { label: "PCA Components", value: "3" },
+      { label: "CC Bin Size", value: "0.5 ms" },
+      { label: "CC Window", value: "+/- 50 ms" },
+      { label: "ISI Bin Size", value: "1 ms" },
+      { label: "FFT Window", value: "Hanning" },
+      { label: "Spectral Overlap", value: "50%" },
+    ],
+    outputs: [
+      { label: "Analyses Run", value: "6 of 6" },
+      { label: "Total Units", value: "3,847" },
+      { label: "Single Units", value: "412" },
+      { label: "Bursts Detected", value: "142" },
+      { label: "Mean Burst Duration", value: "45.2 ms" },
+      { label: "PCA Variance", value: "85.2%" },
+      { label: "Significant CC Pairs", value: "48" },
+      { label: "Mean ISI", value: "18.3 ms" },
+      { label: "Peak Frequency", value: "6.2 Hz (theta)" },
+    ],
+    notes: "Unified analysis covering all 6 analysis types in a single pipeline. Spike sorting yielded 3,847 units with 0.91 median isolation score. Burst detection found 142 network bursts consistent with sharp-wave ripples. PCA explained 85.2% variance across 3 components. Cross-correlation identified 48 significant functional pairs. ISI analysis shows mean 18.3ms interval with burst index 0.34. Spectral analysis reveals dominant theta peak at 6.2 Hz.",
+  },
   "a-001": {
     id: "a-001",
     type: "Spike Sorting",
@@ -267,6 +328,7 @@ const mockAnalysisDb: Record<string, AnalysisDetail> = {
 };
 
 const typeIcons: Record<string, typeof GitBranch> = {
+  "Combined Analysis": LayoutDashboard,
   "Spike Sorting": GitBranch,
   "Burst Detection": TrendingUp,
   "PCA Analysis": Layers,
@@ -821,6 +883,38 @@ function ISIAnalysisChart() {
   );
 }
 
+/** Combined analysis shows all 6 chart types in a 2×3 grid */
+function CombinedAnalysisVisualization() {
+  const sections = [
+    { title: "Spike Sorting", icon: GitBranch, color: "text-neural-accent-cyan", chart: <SpikeSortingChart /> },
+    { title: "Burst Detection", icon: TrendingUp, color: "text-neural-accent-green", chart: <BurstDetectionChart /> },
+    { title: "PCA / Clustering", icon: Layers, color: "text-neural-accent-purple", chart: <PCAScatterChart /> },
+    { title: "Cross-Correlation", icon: Sigma, color: "text-neural-accent-blue", chart: <CrossCorrelationChart /> },
+    { title: "Spectral Analysis", icon: TrendingUp, color: "text-neural-accent-rose", chart: <SpectralAnalysisChart /> },
+    { title: "ISI Analysis", icon: BarChart3, color: "text-neural-accent-amber", chart: <ISIAnalysisChart /> },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {sections.map((s) => {
+        const Icon = s.icon;
+        return (
+          <div
+            key={s.title}
+            className="bg-neural-surface rounded-xl border border-neural-border p-4"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <Icon className={`w-4 h-4 ${s.color}`} />
+              <h3 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider">{s.title}</h3>
+            </div>
+            {s.chart}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function AnalysisVisualization({ job }: { job: AnalysisDetail }) {
   if (job.status === "queued") {
     return (
@@ -832,6 +926,8 @@ function AnalysisVisualization({ job }: { job: AnalysisDetail }) {
   }
 
   switch (job.type) {
+    case "Combined Analysis":
+      return <CombinedAnalysisVisualization />;
     case "Spike Sorting":
       return <SpikeSortingChart />;
     case "Burst Detection":
@@ -903,6 +999,19 @@ export default function AnalysisDetailPage() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
+        {/* Full-width visualization panel for Combined Analysis */}
+        {job.type === "Combined Analysis" && job.status === "completed" && (
+          <div className="mb-4">
+            <div className="bg-neural-surface rounded-xl border border-neural-border p-5">
+              <h2 className="text-sm font-semibold text-neural-text-primary mb-4 flex items-center gap-2">
+                <LayoutDashboard className="w-4 h-4 text-neural-accent-green" />
+                Combined Visualization — All 6 Analyses
+              </h2>
+              <CombinedAnalysisVisualization />
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Main content */}
           <div className="lg:col-span-2 space-y-4">
