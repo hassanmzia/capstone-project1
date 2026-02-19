@@ -83,6 +83,23 @@
   transition: all 0.2s ease-in-out;
 }
 
+/* Chat markdown table striping and compact styling */
+.chat-markdown table {
+  border-collapse: collapse;
+}
+
+.chat-markdown tbody tr:nth-child(even) {
+  background: rgba(26, 35, 50, 0.5);
+}
+
+.chat-markdown p:first-child {
+  margin-top: 0;
+}
+
+.chat-markdown p:last-child {
+  margin-bottom: 0;
+}
+
 body {
   margin: 0;
   padding: 0;

@@ -11,6 +11,7 @@ import {
   setSelectedModel,
 } from "@/store/slices/chatSlice";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import ReactMarkdown from "react-markdown";
 import {
   X,
   Send,
@@ -74,7 +75,88 @@ function MessageBubble({ message }: { message: ChatMessage }) {
               : "bg-neural-surface-alt text-neural-text-primary rounded-tl-sm"
           }`}
         >
-          {message.content}
+          {isUser ? (
+            message.content
+          ) : (
+            <div className="chat-markdown">
+              <ReactMarkdown
+                components={{
+                  table: ({ children }) => (
+                    <div className="overflow-x-auto my-2 rounded-lg border border-neural-border">
+                      <table className="w-full text-xs">{children}</table>
+                    </div>
+                  ),
+                  thead: ({ children }) => (
+                    <thead className="bg-neural-surface border-b border-neural-border text-neural-text-secondary">
+                      {children}
+                    </thead>
+                  ),
+                  th: ({ children }) => (
+                    <th className="px-2.5 py-1.5 text-left font-semibold text-[11px] uppercase tracking-wider whitespace-nowrap">
+                      {children}
+                    </th>
+                  ),
+                  td: ({ children }) => (
+                    <td className="px-2.5 py-1.5 border-t border-neural-border/50 text-neural-text-primary font-mono whitespace-nowrap">
+                      {children}
+                    </td>
+                  ),
+                  tr: ({ children }) => (
+                    <tr className="hover:bg-neural-surface-alt/50 neural-transition">
+                      {children}
+                    </tr>
+                  ),
+                  strong: ({ children }) => (
+                    <strong className="font-semibold text-neural-accent-cyan">{children}</strong>
+                  ),
+                  em: ({ children }) => (
+                    <em className="text-neural-text-secondary not-italic">{children}</em>
+                  ),
+                  ul: ({ children }) => (
+                    <ul className="my-1.5 ml-3 space-y-0.5 list-disc list-outside marker:text-neural-accent-cyan/60">
+                      {children}
+                    </ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="my-1.5 ml-3 space-y-0.5 list-decimal list-outside marker:text-neural-accent-cyan/60">
+                      {children}
+                    </ol>
+                  ),
+                  li: ({ children }) => (
+                    <li className="text-sm leading-relaxed">{children}</li>
+                  ),
+                  code: ({ children, className }) => {
+                    const isBlock = className?.includes("language-");
+                    return isBlock ? (
+                      <pre className="my-2 p-2 rounded-lg bg-neural-bg border border-neural-border overflow-x-auto">
+                        <code className="text-xs font-mono text-neural-accent-green">{children}</code>
+                      </pre>
+                    ) : (
+                      <code className="px-1 py-0.5 rounded bg-neural-bg text-xs font-mono text-neural-accent-amber">
+                        {children}
+                      </code>
+                    );
+                  },
+                  h3: ({ children }) => (
+                    <h3 className="text-xs font-bold text-neural-text-secondary uppercase tracking-wider mt-3 mb-1.5 flex items-center gap-1.5">
+                      {children}
+                    </h3>
+                  ),
+                  h4: ({ children }) => (
+                    <h4 className="text-xs font-semibold text-neural-text-secondary mt-2 mb-1">{children}</h4>
+                  ),
+                  p: ({ children }) => (
+                    <p className="my-1 leading-relaxed">{children}</p>
+                  ),
+                  hr: () => (
+                    <hr className="my-2 border-neural-border" />
+                  ),
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          )}
           {message.isStreaming && (
             <span className="inline-block w-1.5 h-4 bg-neural-accent-cyan ml-0.5 animate-neural-pulse" />
           )}
