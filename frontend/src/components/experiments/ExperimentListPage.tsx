@@ -151,29 +151,29 @@ export default function ExperimentListPage() {
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Toolbar */}
-      <div className="flex items-center justify-between bg-neural-surface rounded-xl border border-neural-border p-3">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 bg-neural-surface rounded-xl border border-neural-border p-2 md:p-3">
         <div className="flex items-center gap-2">
           <FlaskConical className="w-5 h-5 text-neural-accent-purple" />
-          <h1 className="text-lg font-semibold text-neural-text-primary">Experiments</h1>
+          <h1 className="text-base md:text-lg font-semibold text-neural-text-primary">Experiments</h1>
           <span className="text-sm text-neural-text-muted ml-2">({filtered.length})</span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap md:flex-nowrap items-center gap-2 md:gap-3">
           {/* Search */}
-          <div className="relative">
+          <div className="relative flex-1 md:flex-initial">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neural-text-muted" />
             <input
               type="text"
               placeholder="Search experiments..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-1.5 bg-neural-surface-alt border border-neural-border rounded-lg text-sm text-neural-text-primary placeholder:text-neural-text-muted focus:outline-none focus:border-neural-accent-cyan/50 w-64"
+              className="pl-9 pr-4 py-1.5 bg-neural-surface-alt border border-neural-border rounded-lg text-sm text-neural-text-primary placeholder:text-neural-text-muted focus:outline-none focus:border-neural-accent-cyan/50 w-full md:w-64"
             />
           </div>
 
           {/* Status filter */}
-          <div className="flex items-center gap-1 bg-neural-surface-alt rounded-lg p-0.5">
-            <Filter className="w-4 h-4 text-neural-text-muted ml-2" />
+          <div className="flex items-center gap-1 bg-neural-surface-alt rounded-lg p-0.5 overflow-x-auto">
+            <Filter className="w-4 h-4 text-neural-text-muted ml-2 shrink-0" />
             {["all", "active", "draft", "completed", "archived"].map((s) => (
               <button
                 key={s}

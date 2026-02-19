@@ -143,13 +143,16 @@ export default function VisualizationPage() {
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
-  // Panel states
+  // Detect mobile for default panel states
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
+  // Panel states — auto-collapse on mobile
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>("heatmap");
   const [bottomPanelTab, setBottomPanelTab] = useState<BottomPanelTab>("fft");
-  const [showLeftPanel, setShowLeftPanel] = useState(true);
-  const [showRightPanel, setShowRightPanel] = useState(true);
-  const [showBottomPanel, setShowBottomPanel] = useState(true);
-  const [showTelemetry, setShowTelemetry] = useState(true);
+  const [showLeftPanel, setShowLeftPanel] = useState(!isMobile);
+  const [showRightPanel, setShowRightPanel] = useState(!isMobile);
+  const [showBottomPanel, setShowBottomPanel] = useState(!isMobile);
+  const [showTelemetry, setShowTelemetry] = useState(!isMobile);
 
   // Channel selection from electrode array
   const handleElectrodeSelect = useCallback(
@@ -168,16 +171,18 @@ export default function VisualizationPage() {
     dispatch(setSelectedChannels([]));
   }, [dispatch]);
 
-  // Grid template
+  // Grid template — simpler on mobile
   const gridTemplate = useMemo(() => {
+    const isSm = typeof window !== "undefined" && window.innerWidth < 768;
     const cols: string[] = [];
-    if (showLeftPanel) cols.push("220px");
+    if (showLeftPanel && !isSm) cols.push("220px");
     cols.push("1fr");
-    if (showRightPanel) cols.push("280px");
+    if (showRightPanel && !isSm) cols.push("280px");
 
     const rows: string[] = ["auto"];
     rows.push("1fr");
-    if (showBottomPanel) rows.push("280px");
+    if (showBottomPanel && !isSm) rows.push("240px");
+    else if (showBottomPanel && isSm) rows.push("180px");
 
     return {
       gridTemplateColumns: cols.join(" "),
@@ -188,21 +193,21 @@ export default function VisualizationPage() {
   return (
     <div className="flex flex-col h-full gap-0 overflow-hidden">
       {/* ─── Top Toolbar ─── */}
-      <div className="flex items-center justify-between bg-neural-surface border-b border-neural-border px-3 py-2 shrink-0">
+      <div className="flex items-center justify-between bg-neural-surface border-b border-neural-border px-2 md:px-3 py-1.5 md:py-2 shrink-0 gap-1 overflow-x-auto">
         {/* Display mode tabs */}
-        <div className="flex items-center gap-1 bg-neural-surface-alt rounded-lg p-0.5">
+        <div className="flex items-center gap-0.5 md:gap-1 bg-neural-surface-alt rounded-lg p-0.5 shrink-0">
           {displayModes.map(({ mode, label, icon: Icon }) => (
             <button
               key={mode}
               onClick={() => dispatch(setDisplayMode(mode))}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium neural-transition ${
+              className={`flex items-center gap-1 md:gap-1.5 px-1.5 md:px-2.5 py-1 rounded-md text-xs font-medium neural-transition ${
                 viz.displayMode === mode
                   ? "bg-neural-accent-cyan/20 text-neural-accent-cyan"
                   : "text-neural-text-secondary hover:text-neural-text-primary"
               }`}
             >
               <Icon className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">{label}</span>
+              <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
         </div>

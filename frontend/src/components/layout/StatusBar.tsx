@@ -32,7 +32,7 @@ export default function StatusBar() {
   const onlineCount = agents.filter((a) => a.status === "online").length;
 
   return (
-    <footer className="flex items-center justify-between h-8 px-4 bg-neural-surface border-t border-neural-border text-xs">
+    <footer className="hidden md:flex items-center justify-between h-8 px-4 bg-neural-surface border-t border-neural-border text-xs">
       {/* Left: Connection & throughput */}
       <div className="flex items-center gap-5">
         <div className="flex items-center gap-1.5 text-neural-text-muted">
@@ -92,7 +92,8 @@ export default function StatusBar() {
           </span>
         </div>
         <span className="text-neural-border-bright">|</span>
-        <span>CNEAv5 Neural Interface v1.0.0</span>
+        <span className="hidden lg:inline">CNEAv5 Neural Interface v1.0.0</span>
+        <span className="lg:hidden">v1.0.0</span>
       </div>
     </footer>
   );

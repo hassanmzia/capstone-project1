@@ -642,7 +642,7 @@ export default function ChatPanel() {
   if (!isPanelOpen) return null;
 
   return (
-    <div className="w-96 flex flex-col bg-neural-surface border-l border-neural-border h-full">
+    <div className="fixed inset-0 z-40 md:relative md:inset-auto md:z-auto w-full md:w-96 flex flex-col bg-neural-surface border-l border-neural-border h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 h-14 border-b border-neural-border shrink-0">
         <div className="flex items-center gap-2">

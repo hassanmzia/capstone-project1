@@ -254,11 +254,11 @@ export default function DashboardPage() {
   const heatmapData = useMemo(() => Array.from({ length: 64 }, () => Math.random()), []);
 
   return (
-    <div className="flex flex-col gap-4 h-full overflow-y-auto pr-1">
+    <div className="flex flex-col gap-3 md:gap-4 h-full overflow-y-auto pr-1">
       {/* ── Live Session Banner ── */}
       {mode === "live" && activeSession && (
-        <div className="bg-gradient-to-r from-neural-accent-red/10 via-neural-accent-red/5 to-transparent rounded-xl border border-neural-accent-red/30 p-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-gradient-to-r from-neural-accent-red/10 via-neural-accent-red/5 to-transparent rounded-xl border border-neural-accent-red/30 p-3 md:p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-3">
               <div className="relative">
                 <Circle className="w-3 h-3 text-neural-accent-red fill-neural-accent-red animate-neural-pulse" />
@@ -379,9 +379,9 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Main Content Grid ── */}
-      <div className="grid grid-cols-12 gap-4 flex-1 min-h-0">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4 flex-1 min-h-0">
         {/* ── Recent Recordings ── */}
-        <div className="col-span-12 lg:col-span-4 bg-neural-surface rounded-xl border border-neural-border p-4 flex flex-col">
+        <div className="md:col-span-12 lg:col-span-4 bg-neural-surface rounded-xl border border-neural-border p-3 md:p-4 flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <HardDrive className="w-4 h-4 text-neural-accent-cyan" />
@@ -440,7 +440,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Recent Analysis ── */}
-        <div className="col-span-12 lg:col-span-4 bg-neural-surface rounded-xl border border-neural-border p-4 flex flex-col">
+        <div className="md:col-span-12 lg:col-span-4 bg-neural-surface rounded-xl border border-neural-border p-3 md:p-4 flex flex-col">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4 text-neural-accent-green" />
@@ -495,7 +495,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Right Column: System + Quick Actions ── */}
-        <div className="col-span-12 lg:col-span-4 flex flex-col gap-4">
+        <div className="md:col-span-12 lg:col-span-4 flex flex-col gap-3 md:gap-4">
           {/* System Health */}
           <div className="bg-neural-surface rounded-xl border border-neural-border p-4">
             <div className="flex items-center gap-2 mb-3">
@@ -585,9 +585,9 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Bottom Row ── */}
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 md:gap-4">
         {/* Spike Heatmap */}
-        <div className="col-span-12 lg:col-span-3 bg-neural-surface rounded-xl border border-neural-border p-4">
+        <div className="md:col-span-6 lg:col-span-3 bg-neural-surface rounded-xl border border-neural-border p-3 md:p-4">
           <div className="flex items-center gap-2 mb-3">
             <Activity className="w-4 h-4 text-neural-accent-cyan" />
             <h2 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider">
@@ -616,7 +616,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Agent Status */}
-        <div className="col-span-12 lg:col-span-4 bg-neural-surface rounded-xl border border-neural-border p-4">
+        <div className="md:col-span-6 lg:col-span-4 bg-neural-surface rounded-xl border border-neural-border p-3 md:p-4">
           <div className="flex items-center gap-2 mb-3">
             <Cpu className="w-4 h-4 text-neural-accent-purple" />
             <h2 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider">
@@ -656,7 +656,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Activity Feed */}
-        <div className="col-span-12 lg:col-span-5 bg-neural-surface rounded-xl border border-neural-border p-4">
+        <div className="md:col-span-12 lg:col-span-5 bg-neural-surface rounded-xl border border-neural-border p-3 md:p-4">
           <div className="flex items-center gap-2 mb-3">
             <Clock className="w-4 h-4 text-neural-accent-blue" />
             <h2 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider">
@@ -680,7 +680,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Experiments Overview ── */}
-      <div className="bg-neural-surface rounded-xl border border-neural-border p-4">
+      <div className="bg-neural-surface rounded-xl border border-neural-border p-3 md:p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <FlaskConical className="w-4 h-4 text-neural-accent-purple" />
