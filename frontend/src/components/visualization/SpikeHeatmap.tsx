@@ -102,8 +102,12 @@ export default function SpikeHeatmap({
       // Margins for axis labels
       const axisLabelSpace = Math.round(Math.max(18, cW * 0.05));
       const topPad = 4;
-      const size = Math.min(cW - axisLabelSpace, cH - axisLabelSpace - topPad);
-      if (size <= 0) { animRef.current = requestAnimationFrame(renderFrame); return; }
+      const bottomPad = Math.round(Math.max(14, cH * 0.04));
+
+      // Use full available area (rectangular) instead of forcing square
+      const availW = cW - axisLabelSpace;
+      const availH = cH - topPad - bottomPad;
+      if (availW <= 0 || availH <= 0) { animRef.current = requestAnimationFrame(renderFrame); return; }
 
       canvas.width = Math.round(cW * dpr);
       canvas.height = Math.round(cH * dpr);
@@ -115,12 +119,12 @@ export default function SpikeHeatmap({
       ctx.fillStyle = "#0a0f1e";
       ctx.fillRect(0, 0, cW, cH);
 
-      // Center heatmap horizontally when container is wider than tall
-      const extraW = (cW - axisLabelSpace) - size;
-      const ox = axisLabelSpace + Math.max(0, Math.floor(extraW / 2));
-      const oy = topPad;         // heatmap Y offset
-      const cellW = size / gridSize;
-      const cellH = size / gridSize;
+      const ox = axisLabelSpace;
+      const oy = topPad;
+      const heatW = availW;
+      const heatH = availH;
+      const cellW = heatW / gridSize;
+      const cellH = heatH / gridSize;
 
       // Build ImageData
       const offscreen = offscreenRef.current ?? new OffscreenCanvas(gridSize, gridSize);
@@ -155,7 +159,7 @@ export default function SpikeHeatmap({
       // Scale up the small image to fill canvas
       ctx.imageSmoothingEnabled = false;
       offCtx.putImageData(imageData, 0, 0);
-      ctx.drawImage(offscreen, ox, oy, size, size);
+      ctx.drawImage(offscreen, ox, oy, heatW, heatH);
 
       // ── Grid overlay (every 8 electrodes) ──
       if (showGrid) {
@@ -167,13 +171,13 @@ export default function SpikeHeatmap({
           const x = ox + i * cellW;
           ctx.beginPath();
           ctx.moveTo(x, oy);
-          ctx.lineTo(x, oy + size);
+          ctx.lineTo(x, oy + heatH);
           ctx.stroke();
           // Horizontal
           const y = oy + i * cellH;
           ctx.beginPath();
           ctx.moveTo(ox, y);
-          ctx.lineTo(ox + size, y);
+          ctx.lineTo(ox + heatW, y);
           ctx.stroke();
         }
       }
@@ -181,7 +185,7 @@ export default function SpikeHeatmap({
       // ── Heatmap border ──
       ctx.strokeStyle = "rgba(56, 189, 248, 0.25)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(ox, oy, size, size);
+      ctx.strokeRect(ox, oy, heatW, heatH);
 
       // ── Axis tick labels ──
       const tickFont = `${Math.max(7, Math.round(axisLabelSpace * 0.4))}px monospace`;
@@ -201,7 +205,7 @@ export default function SpikeHeatmap({
       ctx.textBaseline = "top";
       for (let c = 0; c < gridSize; c += 8) {
         const x = ox + c * cellW + cellW * 4;
-        ctx.fillText(String(c), x, oy + size + 3);
+        ctx.fillText(String(c), x, oy + heatH + 3);
       }
 
       // ── Selection overlay ──
@@ -250,17 +254,18 @@ export default function SpikeHeatmap({
       const cH = cRect.height;
       const axisLabelSpace = Math.round(Math.max(18, cW * 0.05));
       const topPad = 4;
-      const size = Math.min(cW - axisLabelSpace, cH - axisLabelSpace - topPad);
+      const bottomPad = Math.round(Math.max(14, cH * 0.04));
+      const heatW = cW - axisLabelSpace;
+      const heatH = cH - topPad - bottomPad;
 
       const canvasRect = canvas.getBoundingClientRect();
       const mx = e.clientX - canvasRect.left;
       const my = e.clientY - canvasRect.top;
-      const extraW = (cW - axisLabelSpace) - size;
-      const ox = axisLabelSpace + Math.max(0, Math.floor(extraW / 2));
+      const ox = axisLabelSpace;
       const oy = topPad;
 
-      const col = Math.floor(((mx - ox) / size) * gridSize);
-      const row = Math.floor(((my - oy) / size) * gridSize);
+      const col = Math.floor(((mx - ox) / heatW) * gridSize);
+      const row = Math.floor(((my - oy) / heatH) * gridSize);
       if (row < 0 || row >= gridSize || col < 0 || col >= gridSize) return null;
       return { row, col };
     },
