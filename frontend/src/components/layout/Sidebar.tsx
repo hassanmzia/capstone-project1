@@ -6,6 +6,7 @@ import {
   Activity,
   SlidersHorizontal,
   BarChart3,
+  FileText,
   Settings,
   Brain,
   ChevronLeft,
@@ -20,6 +21,7 @@ const navItems = [
   { path: "/visualization", label: "Visualization", icon: Activity },
   { path: "/controls", label: "Controls", icon: SlidersHorizontal },
   { path: "/analysis", label: "Analysis", icon: BarChart3 },
+  { path: "/reports", label: "Reports", icon: FileText },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 
