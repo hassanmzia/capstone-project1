@@ -143,8 +143,14 @@ export default function VisualizationPage() {
     return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   };
 
-  // Detect mobile for default panel states
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  // Detect mobile for layout decisions
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // Panel states — auto-collapse on mobile
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>("heatmap");
@@ -367,14 +373,14 @@ export default function VisualizationPage() {
       >
       <SpikeEventsProvider totalSites={4096} mode={mode} playbackPaused={playbackPaused}>
       <div
-        className="flex-1 min-h-0 grid gap-1 p-1"
-        style={gridTemplate}
+        className={`flex-1 min-h-0 gap-1 p-1 overflow-hidden ${isMobile ? "flex flex-col" : "grid"}`}
+        style={isMobile ? undefined : gridTemplate}
       >
         {/* ─── Left Panel: Channel List ─── */}
         {showLeftPanel && (
           <div
-            className="bg-neural-surface rounded-lg border border-neural-border overflow-hidden flex flex-col"
-            style={{ gridRow: "2 / -1" }}
+            className={`bg-neural-surface rounded-lg border border-neural-border overflow-hidden flex flex-col ${isMobile ? "max-h-48 shrink-0" : ""}`}
+            style={isMobile ? undefined : { gridRow: "2 / -1" }}
           >
             <div className="flex items-center justify-between px-2.5 py-2 border-b border-neural-border shrink-0">
               <h3 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider">
@@ -429,7 +435,7 @@ export default function VisualizationPage() {
         )}
 
         {/* ─── Main Display Area ─── */}
-        <div className="min-h-0 min-w-0" style={{ gridRow: "2 / 3" }}>
+        <div className={`min-h-0 min-w-0 ${isMobile ? "flex-1" : ""}`} style={isMobile ? undefined : { gridRow: "2 / 3" }}>
           {viz.displayMode === "waveform" && <WaveformDisplay className="h-full" />}
           {viz.displayMode === "heatmap" && <SpikeHeatmap className="h-full" />}
           {viz.displayMode === "raster" && <RasterDisplay className="h-full" />}
@@ -439,8 +445,8 @@ export default function VisualizationPage() {
         {/* ─── Right Panel: Heatmap / Electrode Array / Telemetry ─── */}
         {showRightPanel && (
           <div
-            className="flex flex-col gap-1 min-h-0"
-            style={{ gridRow: "2 / -1" }}
+            className={`flex flex-col gap-1 min-h-0 ${isMobile ? "h-52 shrink-0" : ""}`}
+            style={isMobile ? undefined : { gridRow: "2 / -1" }}
           >
             {/* Tab headers */}
             <div className="flex items-center bg-neural-surface rounded-t-lg border border-neural-border px-2 py-1 shrink-0">
@@ -493,8 +499,8 @@ export default function VisualizationPage() {
         {/* ─── Bottom Panel: FFT / Spectrogram / PCB ─── */}
         {showBottomPanel && (
           <div
-            className="min-h-0 min-w-0 flex flex-col"
-            style={{
+            className={`min-h-0 min-w-0 flex flex-col ${isMobile ? "h-[180px] shrink-0" : ""}`}
+            style={isMobile ? undefined : {
               gridColumn: showLeftPanel ? "2 / 3" : "1 / 2",
               gridRow: "3 / 4",
             }}
