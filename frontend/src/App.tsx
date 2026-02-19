@@ -12,6 +12,8 @@ import ControlsPage from "@/components/controls/ControlsPage";
 import AnalysisPage from "@/components/analysis/AnalysisPage";
 import AnalysisDetailPage from "@/components/analysis/AnalysisDetailPage";
 import NewAnalysisPage from "@/components/analysis/NewAnalysisPage";
+import ReportsPage from "@/components/reports/ReportsPage";
+import ReportViewPage from "@/components/reports/ReportViewPage";
 import SettingsPage from "@/components/settings/SettingsPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -47,6 +49,8 @@ export default function App() {
         <Route path="/analysis" element={<AnalysisPage />} />
         <Route path="/analysis/new" element={<NewAnalysisPage />} />
         <Route path="/analysis/:id" element={<AnalysisDetailPage />} />
+        <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/reports/:id" element={<ReportViewPage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>
