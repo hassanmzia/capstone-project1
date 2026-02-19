@@ -203,21 +203,21 @@ export default function NewAnalysisPage() {
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Top bar */}
-      <div className="flex items-center justify-between bg-neural-surface rounded-xl border border-neural-border p-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-2 bg-neural-surface rounded-xl border border-neural-border p-3">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => navigate("/analysis")}
-            className="p-1.5 rounded-lg hover:bg-neural-surface-alt text-neural-text-muted hover:text-neural-text-primary neural-transition"
+            className="p-1.5 rounded-lg hover:bg-neural-surface-alt text-neural-text-muted hover:text-neural-text-primary neural-transition shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <BarChart3 className="w-5 h-5 text-neural-accent-green" />
-          <h1 className="text-lg font-semibold text-neural-text-primary">New Analysis</h1>
+          <BarChart3 className="w-5 h-5 text-neural-accent-green shrink-0" />
+          <h1 className="text-lg font-semibold text-neural-text-primary truncate">New Analysis</h1>
         </div>
         <button
           onClick={handleStart}
           disabled={!canStart}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm border neural-transition ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm border neural-transition shrink-0 ${
             canStart
               ? "bg-neural-accent-green/20 text-neural-accent-green border-neural-accent-green/30 hover:bg-neural-accent-green/30"
               : "bg-neural-surface-alt text-neural-text-muted border-neural-border cursor-not-allowed"
@@ -229,7 +229,7 @@ export default function NewAnalysisPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Step 1: Select type */}
           <div className="space-y-4">

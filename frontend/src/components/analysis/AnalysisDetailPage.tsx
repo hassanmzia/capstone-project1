@@ -983,22 +983,22 @@ export default function AnalysisDetailPage() {
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Top bar */}
-      <div className="flex items-center justify-between bg-neural-surface rounded-xl border border-neural-border p-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center flex-wrap gap-2 bg-neural-surface rounded-xl border border-neural-border p-3">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => navigate("/analysis")}
-            className="p-1.5 rounded-lg hover:bg-neural-surface-alt text-neural-text-muted hover:text-neural-text-primary neural-transition"
+            className="p-1.5 rounded-lg hover:bg-neural-surface-alt text-neural-text-muted hover:text-neural-text-primary neural-transition shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <TypeIcon className="w-5 h-5 text-neural-accent-green" />
-          <h1 className="text-lg font-semibold text-neural-text-primary">{job.type}</h1>
+          <TypeIcon className="w-5 h-5 text-neural-accent-green shrink-0" />
+          <h1 className="text-lg font-semibold text-neural-text-primary truncate">{job.type}</h1>
           {statusBadge(job.status)}
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden min-w-0">
         {/* Full-width visualization panel for Combined Analysis */}
         {job.type === "Combined Analysis" && job.status === "completed" && (
           <div className="mb-4">
@@ -1018,7 +1018,7 @@ export default function AnalysisDetailPage() {
             {/* Overview */}
             <div className="bg-neural-surface rounded-xl border border-neural-border p-5">
               <h2 className="text-sm font-semibold text-neural-text-primary mb-4">Job Overview</h2>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
                   <span className="text-xs text-neural-text-muted flex items-center gap-1"><HardDrive className="w-3 h-3" /> Recording</span>
                   <p className="text-sm font-mono text-neural-text-primary mt-1">{job.recording}</p>
@@ -1078,7 +1078,7 @@ export default function AnalysisDetailPage() {
                 <Cpu className="w-4 h-4 text-neural-text-muted" />
                 Parameters
               </h2>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {job.parameters.map((p) => (
                   <div key={p.label} className="p-3 rounded-lg bg-neural-surface-alt border border-neural-border">
                     <span className="text-xs text-neural-text-muted">{p.label}</span>

@@ -64,23 +64,23 @@ export default function AnalysisPage() {
   return (
     <div className="flex flex-col gap-4 h-full">
       {/* Header */}
-      <div className="flex items-center justify-between bg-neural-surface rounded-xl border border-neural-border p-3">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-neural-accent-green" />
-          <h1 className="text-lg font-semibold text-neural-text-primary">Analysis</h1>
+      <div className="flex items-center justify-between flex-wrap gap-2 bg-neural-surface rounded-xl border border-neural-border p-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <BarChart3 className="w-5 h-5 text-neural-accent-green shrink-0" />
+          <h1 className="text-lg font-semibold text-neural-text-primary truncate">Analysis</h1>
         </div>
         <button
           onClick={() => navigate("/analysis/new")}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-green/20 text-neural-accent-green hover:bg-neural-accent-green/30 border border-neural-accent-green/30 neural-transition"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm bg-neural-accent-green/20 text-neural-accent-green hover:bg-neural-accent-green/30 border border-neural-accent-green/30 neural-transition shrink-0"
         >
           <Play className="w-4 h-4" />
           New Analysis
         </button>
       </div>
 
-      <div className="flex gap-4 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         {/* Analysis types */}
-        <div className="w-80 bg-neural-surface rounded-xl border border-neural-border p-4 overflow-y-auto">
+        <div className="w-full lg:w-80 shrink-0 bg-neural-surface rounded-xl border border-neural-border p-4 overflow-y-auto">
           <h2 className="text-xs font-semibold text-neural-text-secondary uppercase tracking-wider mb-3">
             Analysis Types
           </h2>
@@ -159,7 +159,7 @@ export default function AnalysisPage() {
                   </span>
                 </div>
 
-                <div className="flex items-center gap-4 text-xs text-neural-text-muted mb-2">
+                <div className="flex items-center gap-4 text-xs text-neural-text-muted mb-2 flex-wrap">
                   <span>Recording: {job.recording}</span>
                   <span>Duration: {job.duration}</span>
                 </div>
