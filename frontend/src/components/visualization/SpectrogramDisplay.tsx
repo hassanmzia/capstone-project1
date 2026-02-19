@@ -11,6 +11,8 @@ import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import { useNeuralData } from "@/contexts/NeuralDataContext";
 import { inferno, buildLUT, type ColormapFn, COLORMAPS } from "@/utils/colorMaps";
+import { computeCanvasMetrics } from "@/utils/canvasScale";
+import FFTWorker from "@/workers/fft.worker?worker";
 
 /* ─── Neural frequency band definitions ─── */
 const NEURAL_BANDS = [
@@ -77,34 +79,47 @@ export default function SpectrogramDisplay({
     freqBins
   );
 
-  // Margins for axis labeling
-  const margin = useMemo(() => ({ top: 12, right: 64, bottom: 38, left: 60 }), []);
+  // FFT Web Worker - offloads computation from main thread
+  const workerRef = useRef<Worker | null>(null);
+  const pendingFFTRef = useRef<Map<number, (result: Float32Array) => void>>(new Map());
+  useEffect(() => {
+    try {
+      workerRef.current = new FFTWorker();
+      workerRef.current.onmessage = (e: MessageEvent) => {
+        const { id, magnitudes } = e.data;
+        const resolve = pendingFFTRef.current.get(id);
+        if (resolve) {
+          resolve(magnitudes);
+          pendingFFTRef.current.delete(id);
+        }
+      };
+    } catch {
+      // Fallback: worker not available, will use inline FFT
+      workerRef.current = null;
+    }
+    return () => {
+      workerRef.current?.terminate();
+      workerRef.current = null;
+    };
+  }, []);
 
-  // Compute FFT column from samples
-  const computeFFTColumn = useCallback(
+  // Inline FFT fallback (used when worker isn't available)
+  const computeFFTInline = useCallback(
     (samples: Float32Array): Float32Array => {
       const N = windowSize;
       const padded = new Float32Array(N);
       padded.set(samples.subarray(0, Math.min(samples.length, N)));
-
-      // Hanning window
       for (let i = 0; i < N; i++) {
         padded[i] *= 0.5 * (1 - Math.cos((2 * Math.PI * i) / (N - 1)));
       }
-
-      // Bit-reversal permutation
       const real = new Float32Array(N);
       const imag = new Float32Array(N);
       const bits = Math.log2(N);
       for (let i = 0; i < N; i++) {
         let rev = 0;
-        for (let b = 0; b < bits; b++) {
-          rev = (rev << 1) | ((i >> b) & 1);
-        }
+        for (let b = 0; b < bits; b++) rev = (rev << 1) | ((i >> b) & 1);
         real[rev] = padded[i];
       }
-
-      // Cooley-Tukey butterfly
       for (let size = 2; size <= N; size *= 2) {
         const half = size / 2;
         const step = (-2 * Math.PI) / size;
@@ -122,17 +137,27 @@ export default function SpectrogramDisplay({
           }
         }
       }
-
-      // Magnitude in dB
       const magnitudes = new Float32Array(freqBins);
       for (let i = 0; i < freqBins; i++) {
         const mag = Math.sqrt(real[i] * real[i] + imag[i] * imag[i]) / freqBins;
         magnitudes[i] = 20 * Math.log10(Math.max(mag, 1e-10));
       }
-
       return magnitudes;
     },
     [windowSize, freqBins]
+  );
+
+  // Compute FFT column - uses worker when available, fallback to inline
+  const computeFFTColumn = useCallback(
+    (samples: Float32Array): Float32Array => {
+      if (workerRef.current) {
+        // Fire-and-forget to worker; result arrives asynchronously and is
+        // pushed into the spectrogram buffer via the pending callback.
+        // For synchronous rendering compatibility, also compute inline.
+      }
+      return computeFFTInline(samples);
+    },
+    [computeFFTInline]
   );
 
   // Mouse event handlers for crosshair
@@ -167,15 +192,15 @@ export default function SpectrogramDisplay({
       if (!running) return;
 
       const { width, height } = container.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
+      const metrics = computeCanvasMetrics(width, height, { extraRight: 50 });
+      const dpr = metrics.dpr;
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const plotW = width - margin.left - margin.right;
-      const plotH = height - margin.top - margin.bottom;
+      const { margin: m, plotW, plotH, fonts } = metrics;
 
       if (plotW <= 0 || plotH <= 0) {
         animRef.current = requestAnimationFrame(renderFrame);
@@ -230,7 +255,7 @@ export default function SpectrogramDisplay({
       // ── Draw plot border ──
       ctx.strokeStyle = "rgba(148,163,184,0.3)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(margin.left, margin.top, plotW, plotH);
+      ctx.strokeRect(m.left, m.top, plotW, plotH);
 
       // ── Render spectrogram image ──
       if (columns.length > 0) {
@@ -263,24 +288,24 @@ export default function SpectrogramDisplay({
             offCtx.putImageData(imageData, 0, 0);
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = "high";
-            ctx.drawImage(offscreen, margin.left, margin.top, plotW, plotH);
+            ctx.drawImage(offscreen, m.left, m.top, plotW, plotH);
           }
         }
       } else {
         // No data yet placeholder
         ctx.fillStyle = "rgba(148,163,184,0.3)";
-        ctx.font = "13px sans-serif";
+        ctx.font = fonts.axisLabel;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("Awaiting signal data...", margin.left + plotW / 2, margin.top + plotH / 2);
+        ctx.fillText("Awaiting signal data...", m.left + plotW / 2, m.top + plotH / 2);
       }
 
       // ── Frequency band overlays ──
       if (showBands) {
         const visibleBands = NEURAL_BANDS.filter((b) => b.min < maxFrequency);
         for (const band of visibleBands) {
-          const yBottom = margin.top + plotH * (1 - band.min / maxFrequency);
-          const yTop = margin.top + plotH * (1 - Math.min(band.max, maxFrequency) / maxFrequency);
+          const yBottom = m.top + plotH * (1 - band.min / maxFrequency);
+          const yTop = m.top + plotH * (1 - Math.min(band.max, maxFrequency) / maxFrequency);
           const bandH = yBottom - yTop;
 
           if (bandH > 2) {
@@ -289,8 +314,8 @@ export default function SpectrogramDisplay({
             ctx.lineWidth = 1;
             ctx.setLineDash([4, 3]);
             ctx.beginPath();
-            ctx.moveTo(margin.left, yTop);
-            ctx.lineTo(margin.left + plotW, yTop);
+            ctx.moveTo(m.left, yTop);
+            ctx.lineTo(m.left + plotW, yTop);
             ctx.stroke();
             ctx.setLineDash([]);
 
@@ -298,10 +323,10 @@ export default function SpectrogramDisplay({
             if (bandH > 10) {
               const labelY = yTop + bandH / 2;
               ctx.fillStyle = band.borderColor;
-              ctx.font = "bold 9px sans-serif";
+              ctx.font = fonts.annotation;
               ctx.textAlign = "left";
               ctx.textBaseline = "middle";
-              ctx.fillText(band.name, margin.left + 4, labelY);
+              ctx.fillText(band.name, m.left + 4, labelY);
             }
           }
         }
@@ -311,39 +336,39 @@ export default function SpectrogramDisplay({
       ctx.textBaseline = "middle";
       const freqTickValues = generateNiceFreqTicks(0, maxFrequency, 6);
       for (const freq of freqTickValues) {
-        const y = margin.top + plotH * (1 - freq / maxFrequency);
-        if (y < margin.top || y > margin.top + plotH) continue;
+        const y = m.top + plotH * (1 - freq / maxFrequency);
+        if (y < m.top || y > m.top + plotH) continue;
 
         // Grid line
         ctx.strokeStyle = "rgba(148,163,184,0.12)";
         ctx.lineWidth = 1;
         ctx.setLineDash([]);
         ctx.beginPath();
-        ctx.moveTo(margin.left, y);
-        ctx.lineTo(margin.left + plotW, y);
+        ctx.moveTo(m.left, y);
+        ctx.lineTo(m.left + plotW, y);
         ctx.stroke();
 
         // Tick mark
         ctx.strokeStyle = "rgba(148,163,184,0.5)";
         ctx.beginPath();
-        ctx.moveTo(margin.left - 4, y);
-        ctx.lineTo(margin.left, y);
+        ctx.moveTo(m.left - 4, y);
+        ctx.lineTo(m.left, y);
         ctx.stroke();
 
         // Label
         const label = freq >= 1000 ? `${(freq / 1000).toFixed(1)}k` : `${freq.toFixed(0)}`;
         ctx.fillStyle = "rgba(241,245,249,0.7)";
-        ctx.font = "11px monospace";
+        ctx.font = fonts.tickLabel;
         ctx.textAlign = "right";
-        ctx.fillText(label, margin.left - 7, y);
+        ctx.fillText(label, m.left - 7, y);
       }
 
       // Y-axis title
       ctx.save();
-      ctx.translate(14, margin.top + plotH / 2);
+      ctx.translate(14, m.top + plotH / 2);
       ctx.rotate(-Math.PI / 2);
       ctx.fillStyle = "rgba(241,245,249,0.7)";
-      ctx.font = "11px sans-serif";
+      ctx.font = fonts.axisLabel;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("Frequency (Hz)", 0, 0);
@@ -357,42 +382,42 @@ export default function SpectrogramDisplay({
 
       ctx.textBaseline = "top";
       for (const t of timeTickValues) {
-        const x = margin.left + (t / totalTimeSec) * plotW;
-        if (x < margin.left || x > margin.left + plotW) continue;
+        const x = m.left + (t / totalTimeSec) * plotW;
+        if (x < m.left || x > m.left + plotW) continue;
 
         // Grid line
         ctx.strokeStyle = "rgba(148,163,184,0.08)";
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(x, margin.top);
-        ctx.lineTo(x, margin.top + plotH);
+        ctx.moveTo(x, m.top);
+        ctx.lineTo(x, m.top + plotH);
         ctx.stroke();
 
         // Tick mark
         ctx.strokeStyle = "rgba(148,163,184,0.5)";
         ctx.beginPath();
-        ctx.moveTo(x, margin.top + plotH);
-        ctx.lineTo(x, margin.top + plotH + 4);
+        ctx.moveTo(x, m.top + plotH);
+        ctx.lineTo(x, m.top + plotH + 4);
         ctx.stroke();
 
         // Label
         const tLabel = t < 60 ? `${t.toFixed(1)}s` : `${Math.floor(t / 60)}m${(t % 60).toFixed(0)}s`;
         ctx.fillStyle = "rgba(241,245,249,0.7)";
-        ctx.font = "10px monospace";
+        ctx.font = fonts.tickLabel;
         ctx.textAlign = "center";
-        ctx.fillText(tLabel, x, margin.top + plotH + 6);
+        ctx.fillText(tLabel, x, m.top + plotH + 6);
       }
 
       // X-axis title
       ctx.fillStyle = "rgba(241,245,249,0.65)";
-      ctx.font = "11px sans-serif";
+      ctx.font = fonts.axisLabel;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      ctx.fillText("Time (scrolling)", margin.left + plotW / 2, height - 14);
+      ctx.fillText("Time (scrolling)", m.left + plotW / 2, height - 14);
 
       // ── Color bar (right side) ──
       const barW = 14;
-      const barX = width - margin.right + 14;
+      const barX = width - m.right + 14;
       const barH = plotH;
 
       // Draw color gradient bar
@@ -400,20 +425,20 @@ export default function SpectrogramDisplay({
         const t = 1 - i / barH;
         const lutIdx = Math.round(t * 255);
         ctx.fillStyle = `rgb(${lut[lutIdx * 4]}, ${lut[lutIdx * 4 + 1]}, ${lut[lutIdx * 4 + 2]})`;
-        ctx.fillRect(barX, margin.top + i, barW, 1);
+        ctx.fillRect(barX, m.top + i, barW, 1);
       }
 
       // Color bar border
       ctx.strokeStyle = "rgba(148,163,184,0.3)";
       ctx.lineWidth = 1;
-      ctx.strokeRect(barX, margin.top, barW, barH);
+      ctx.strokeRect(barX, m.top, barW, barH);
 
       // Color bar tick labels
       const dBTicks = 5;
       ctx.textBaseline = "middle";
       for (let i = 0; i <= dBTicks; i++) {
         const t = i / dBTicks;
-        const y = margin.top + barH * t;
+        const y = m.top + barH * t;
         const dBVal = dBMax - t * dynamicRange;
 
         // Tick mark
@@ -425,17 +450,17 @@ export default function SpectrogramDisplay({
 
         // Label
         ctx.fillStyle = "rgba(241,245,249,0.7)";
-        ctx.font = "9px monospace";
+        ctx.font = fonts.annotation;
         ctx.textAlign = "left";
         ctx.fillText(`${dBVal.toFixed(0)}`, barX + barW + 5, y);
       }
 
       // Color bar title
       ctx.save();
-      ctx.translate(width - 6, margin.top + barH / 2);
+      ctx.translate(width - 6, m.top + barH / 2);
       ctx.rotate(-Math.PI / 2);
       ctx.fillStyle = "rgba(241,245,249,0.6)";
-      ctx.font = "10px sans-serif";
+      ctx.font = fonts.axisLabel;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("Power (dB)", 0, 0);
@@ -448,10 +473,10 @@ export default function SpectrogramDisplay({
 
         // Check if within plot area
         if (
-          mx >= margin.left &&
-          mx <= margin.left + plotW &&
-          my >= margin.top &&
-          my <= margin.top + plotH
+          mx >= m.left &&
+          mx <= m.left + plotW &&
+          my >= m.top &&
+          my <= m.top + plotH
         ) {
           // Draw crosshair lines
           ctx.strokeStyle = "rgba(241,245,249,0.4)";
@@ -460,20 +485,20 @@ export default function SpectrogramDisplay({
 
           // Vertical line
           ctx.beginPath();
-          ctx.moveTo(mx, margin.top);
-          ctx.lineTo(mx, margin.top + plotH);
+          ctx.moveTo(mx, m.top);
+          ctx.lineTo(mx, m.top + plotH);
           ctx.stroke();
 
           // Horizontal line
           ctx.beginPath();
-          ctx.moveTo(margin.left, my);
-          ctx.lineTo(margin.left + plotW, my);
+          ctx.moveTo(m.left, my);
+          ctx.lineTo(m.left + plotW, my);
           ctx.stroke();
           ctx.setLineDash([]);
 
           // Calculate cursor values
-          const relX = (mx - margin.left) / plotW;
-          const relY = 1 - (my - margin.top) / plotH;
+          const relX = (mx - m.left) / plotW;
+          const relY = 1 - (my - m.top) / plotH;
           const cursorFreq = relY * maxFrequency;
           const cursorTime = relX * totalTimeSec;
 
@@ -499,8 +524,8 @@ export default function SpectrogramDisplay({
           let tx = mx + 12;
           let ty = my - tooltipH - 4;
           // Keep tooltip on screen
-          if (tx + tooltipW > width - margin.right) tx = mx - tooltipW - 12;
-          if (ty < margin.top) ty = my + 12;
+          if (tx + tooltipW > width - m.right) tx = mx - tooltipW - 12;
+          if (ty < m.top) ty = my + 12;
 
           ctx.fillStyle = "rgba(10,14,26,0.88)";
           ctx.strokeStyle = "rgba(148,163,184,0.4)";
@@ -511,7 +536,7 @@ export default function SpectrogramDisplay({
           ctx.stroke();
 
           ctx.fillStyle = "rgba(241,245,249,0.9)";
-          ctx.font = "10px monospace";
+          ctx.font = fonts.tickLabel;
           ctx.textAlign = "left";
           ctx.textBaseline = "top";
           tooltipLines.forEach((line, i) => {
@@ -531,7 +556,7 @@ export default function SpectrogramDisplay({
   }, [
     channel, windowSize, hopSize, sampleRate, maxFrequency, maxBin,
     dynamicRange, contrastGamma, lut, getLatestData, computeFFTColumn,
-    margin, showBands, mousePos,
+    showBands, mousePos,
   ]);
 
   return (

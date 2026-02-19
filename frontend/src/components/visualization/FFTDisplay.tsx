@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import { useNeuralData } from "@/contexts/NeuralDataContext";
+import { computeCanvasMetrics } from "@/utils/canvasScale";
 
 interface FFTDisplayProps {
   className?: string;
@@ -118,17 +119,15 @@ export default function FFTDisplay({
       if (!running) return;
 
       const { width, height } = container.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
+      const metrics = computeCanvasMetrics(width, height);
+      const dpr = metrics.dpr;
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      // Layout
-      const margin = { top: 10, right: 15, bottom: 30, left: 50 };
-      const plotW = width - margin.left - margin.right;
-      const plotH = height - margin.top - margin.bottom;
+      const { margin, plotW, plotH, fonts } = metrics;
 
       // Clear background
       ctx.fillStyle = "#0f1117";
@@ -158,7 +157,7 @@ export default function FFTDisplay({
         ctx.stroke();
 
         ctx.fillStyle = "rgba(255,255,255,0.4)";
-        ctx.font = "10px monospace";
+        ctx.font = fonts.tickLabel;
         ctx.textAlign = "right";
         ctx.fillText(`${dB}`, margin.left - 5, y + 3);
       }
@@ -174,7 +173,7 @@ export default function FFTDisplay({
         ctx.stroke();
 
         ctx.fillStyle = "rgba(255,255,255,0.4)";
-        ctx.font = "10px monospace";
+        ctx.font = fonts.tickLabel;
         ctx.textAlign = "center";
         const label = f >= 1000 ? `${(f / 1000).toFixed(1)}k` : `${f}`;
         ctx.fillText(label, x, margin.top + plotH + 15);
@@ -182,7 +181,7 @@ export default function FFTDisplay({
 
       // Axis labels
       ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.font = "10px sans-serif";
+      ctx.font = fonts.axisLabel;
       ctx.textAlign = "center";
       ctx.fillText("Frequency (Hz)", margin.left + plotW / 2, height - 3);
 
@@ -256,7 +255,7 @@ export default function FFTDisplay({
           ctx.arc(px, py, 3, 0, Math.PI * 2);
           ctx.fill();
 
-          ctx.font = "9px monospace";
+          ctx.font = fonts.annotation;
           ctx.textAlign = "center";
           ctx.fillText(
             `${peakFreq >= 1000 ? (peakFreq / 1000).toFixed(1) + "k" : peakFreq.toFixed(0)}Hz`,

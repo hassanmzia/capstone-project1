@@ -4,7 +4,7 @@
  * with LOD decimation built in.
  */
 
-import { decimateMinMax } from "./LODEngine";
+import { decimateMinMax, bufferPool } from "./LODEngine";
 
 /* ─── Shader Sources ─── */
 
@@ -89,6 +89,8 @@ interface ChannelState {
   vao: WebGLVertexArrayObject | null;
   sampleCount: number;
   active: boolean;
+  /** Pooled buffer for decimated output — returned to pool on next upload. */
+  decimatedBuf: Float32Array | null;
 }
 
 /* ─── Renderer Class ─── */
@@ -248,6 +250,7 @@ export class WaveformWebGLRenderer {
         vao,
         sampleCount: 0,
         active: false,
+        decimatedBuf: null,
       });
     }
   }
@@ -276,6 +279,12 @@ export class WaveformWebGLRenderer {
     const ch = this.channels[channelIndex];
     if (!ch.active || !ch.vao || !ch.vboIndex || !ch.vboValue || !this.waveformProgram) return;
 
+    // Return previous pooled buffer before acquiring a new one
+    if (ch.decimatedBuf) {
+      bufferPool.release(ch.decimatedBuf);
+      ch.decimatedBuf = null;
+    }
+
     // Apply LOD decimation: compute min/max per pixel column
     const viewSamples = this.viewEndSample - this.viewStartSample;
     const canvasWidth = this.canvas.width;
@@ -283,9 +292,12 @@ export class WaveformWebGLRenderer {
     let sampleCount: number;
 
     if (ch.data.length > canvasWidth * 2 && viewSamples > canvasWidth * 2) {
-      // Need decimation: use min/max per pixel
-      const decimated = decimateMinMax(ch.data, canvasWidth);
-      sampleCount = canvasWidth * 2;
+      // Need decimation: acquire a pooled buffer and reuse it
+      const needed = canvasWidth * 2;
+      const reuse = bufferPool.acquire(needed);
+      const decimated = decimateMinMax(ch.data, canvasWidth, reuse);
+      ch.decimatedBuf = reuse; // track for release on next upload
+      sampleCount = needed;
       displayData = decimated;
     } else {
       displayData = ch.data;
@@ -467,12 +479,18 @@ export class WaveformWebGLRenderer {
 
   /**
    * Resize the canvas and update the GL viewport.
+   * Automatically accounts for devicePixelRatio for HiDPI displays.
    */
   resize(width: number, height: number): void {
-    this.canvas.width = width;
-    this.canvas.height = height;
+    const dpr = window.devicePixelRatio || 1;
+    const scaledW = Math.round(width * dpr);
+    const scaledH = Math.round(height * dpr);
+    this.canvas.width = scaledW;
+    this.canvas.height = scaledH;
+    this.canvas.style.width = `${width}px`;
+    this.canvas.style.height = `${height}px`;
     if (this.gl) {
-      this.gl.viewport(0, 0, width, height);
+      this.gl.viewport(0, 0, scaledW, scaledH);
     }
   }
 
@@ -487,6 +505,7 @@ export class WaveformWebGLRenderer {
       if (ch.vboIndex) gl.deleteBuffer(ch.vboIndex);
       if (ch.vboValue) gl.deleteBuffer(ch.vboValue);
       if (ch.vao) gl.deleteVertexArray(ch.vao);
+      if (ch.decimatedBuf) bufferPool.release(ch.decimatedBuf);
     }
     this.channels = [];
 

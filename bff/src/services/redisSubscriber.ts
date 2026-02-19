@@ -30,8 +30,37 @@ const REDIS_CHANNELS: RedisChannel[] = [
   'neural:telemetry',
 ];
 
+/**
+ * High-frequency channels are batched before broadcasting to reduce per-message
+ * overhead. Events are accumulated and flushed every BATCH_INTERVAL_MS.
+ */
+const BATCH_INTERVAL_MS = 16; // ~60 Hz flush rate
+const BATCHABLE_CHANNELS: Set<RedisChannel> = new Set([
+  'neural:spike_events',
+  'neural:telemetry',
+]);
+
 let subscriber: Redis | null = null;
 let isConnected = false;
+
+/** Pending batched messages keyed by WsChannel. */
+const batchBuffers: Map<WsChannel, string[]> = new Map();
+let batchTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Flush all accumulated batches to WebSocket clients. */
+function flushBatches(): void {
+  for (const [wsChannel, msgs] of batchBuffers.entries()) {
+    if (msgs.length === 0) continue;
+
+    if (msgs.length === 1) {
+      wsManager.broadcast(wsChannel, msgs[0]);
+    } else {
+      // Wrap multiple messages in a JSON array batch envelope
+      wsManager.broadcast(wsChannel, `[${msgs.join(',')}]`);
+    }
+    msgs.length = 0; // clear without re-allocating
+  }
+}
 
 /**
  * Initialize the Redis subscriber and begin listening for messages.
@@ -65,7 +94,8 @@ export function initRedisSubscriber(redisUrl: string): void {
 
   // Handle incoming messages from subscribed channels
   subscriber.on('message', (channel: string, message: string) => {
-    const wsChannel = CHANNEL_MAP[channel as RedisChannel];
+    const redisChannel = channel as RedisChannel;
+    const wsChannel = CHANNEL_MAP[redisChannel];
     if (!wsChannel) {
       console.warn(
         `[RedisSubscriber] Received message on unknown channel: ${channel}`
@@ -76,13 +106,29 @@ export function initRedisSubscriber(redisUrl: string): void {
     try {
       // Validate JSON before broadcasting
       JSON.parse(message);
-      wsManager.broadcast(wsChannel, message);
+
+      if (BATCHABLE_CHANNELS.has(redisChannel)) {
+        // Accumulate into batch buffer — flushed on timer
+        let buf = batchBuffers.get(wsChannel);
+        if (!buf) {
+          buf = [];
+          batchBuffers.set(wsChannel, buf);
+        }
+        buf.push(message);
+      } else {
+        wsManager.broadcast(wsChannel, message);
+      }
     } catch {
       console.error(
         `[RedisSubscriber] Invalid JSON on channel "${channel}": ${message.substring(0, 100)}`
       );
     }
   });
+
+  // Start batch flush timer for high-frequency channels
+  if (!batchTimer) {
+    batchTimer = setInterval(flushBatches, BATCH_INTERVAL_MS);
+  }
 
   // Connect and subscribe
   subscriber
@@ -113,6 +159,13 @@ export function isRedisConnected(): boolean {
  * Gracefully close the Redis subscriber connection.
  */
 export async function closeRedisSubscriber(): Promise<void> {
+  // Stop batch timer
+  if (batchTimer) {
+    clearInterval(batchTimer);
+    flushBatches(); // send any remaining buffered messages
+    batchTimer = null;
+  }
+
   if (subscriber) {
     try {
       await subscriber.unsubscribe();
