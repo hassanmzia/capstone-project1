@@ -115,7 +115,9 @@ export default function SpikeHeatmap({
       ctx.fillStyle = "#0a0f1e";
       ctx.fillRect(0, 0, cW, cH);
 
-      const ox = axisLabelSpace; // heatmap X offset
+      // Center heatmap horizontally when container is wider than tall
+      const extraW = (cW - axisLabelSpace) - size;
+      const ox = axisLabelSpace + Math.max(0, Math.floor(extraW / 2));
       const oy = topPad;         // heatmap Y offset
       const cellW = size / gridSize;
       const cellH = size / gridSize;
@@ -253,7 +255,8 @@ export default function SpikeHeatmap({
       const canvasRect = canvas.getBoundingClientRect();
       const mx = e.clientX - canvasRect.left;
       const my = e.clientY - canvasRect.top;
-      const ox = axisLabelSpace;
+      const extraW = (cW - axisLabelSpace) - size;
+      const ox = axisLabelSpace + Math.max(0, Math.floor(extraW / 2));
       const oy = topPad;
 
       const col = Math.floor(((mx - ox) / size) * gridSize);
@@ -405,7 +408,7 @@ export default function SpikeHeatmap({
       </div>
 
       {/* ── Canvas ── */}
-      <div ref={containerRef} className="flex-1 relative p-1 min-h-0 aspect-square">
+      <div ref={containerRef} className="flex-1 relative p-1 min-h-0">
         <canvas
           ref={canvasRef}
           className="absolute inset-1 cursor-crosshair"
